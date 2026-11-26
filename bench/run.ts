@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { MAX_STEPS, runAgent, type Mode } from './lib/agent.ts'
-import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
+import { APP_PORT, APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser } from './lib/browser.ts'
 import { resolveModel } from './lib/model.ts'
 import { TASKS } from './lib/tasks.ts'
@@ -59,7 +59,7 @@ try {
     for (const mode of modes) {
       for (let run = 1; run <= runs; run += 1) {
         const seed = resetDatabase()
-        const options = { session: `bench-${task.id}-${mode}-${run}`, webmcp: mode === 'webmcp' }
+        const options = { session: `bench-${APP_PORT}-${task.id}-${mode}-${run}`, webmcp: mode === 'webmcp' }
         await browser(options, ['open', APP_URL])
         const result = await runAgent(resolved.model, mode, task.prompt, options)
         await browser(options, ['close'])

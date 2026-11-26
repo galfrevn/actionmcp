@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
+import { APP_PORT, APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser, browserJson } from './lib/browser.ts'
 import { TASKS } from './lib/tasks.ts'
 
@@ -12,7 +12,7 @@ interface Invocation {
   output: { ok: boolean; data?: unknown; error?: { message: string } }
 }
 
-const options = { session: 'bench-smoke', webmcp: true }
+const options = { session: `bench-smoke-${APP_PORT}`, webmcp: true }
 const invoke = (tool: string, input: Record<string, unknown>) =>
   browserJson<Invocation>(options, ['webmcp', 'invoke', tool, JSON.stringify(input)])
 

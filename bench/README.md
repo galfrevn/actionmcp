@@ -51,6 +51,15 @@ pnpm --filter actionmcp-bench summarize bench/results/<date>
 
 Options: `--model`, `--runs`, `--tasks invite-member,composite`, `--modes clicks,webmcp`, and `--out <directory>`.
 
+Two runs can share one machine. Each run needs its own copy of the built app, because the database is a file inside the app folder, and its own port:
+
+```bash
+cp -R bench/app bench/app-second
+BENCH_APP_DIRECTORY="$PWD/bench/app-second" BENCH_PORT=4401 pnpm bench --model anthropic/claude-haiku-5.5 --out "$PWD/bench/results/<name>"
+```
+
+Runs that share a machine can affect each other's times. Report it with the results.
+
 ## Confirmations
 
 The confirmation dialog needs a human click, so a benchmark run cannot pass it. `bench/app` reads `BENCH_AUTO_CONFIRM=1` and then mounts an `AgentToolsProvider` whose `confirmComponent` accepts every confirmation. The harness sets the variable. Do not copy this into an app that real users open.
