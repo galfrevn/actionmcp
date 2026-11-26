@@ -2,7 +2,16 @@ import { isRecord } from './guards'
 import type { SchemaIssue } from './schema'
 import type { ToolAdapter } from './types'
 
-export type AgentErrorCode = 'invalid_input' | 'unauthorized' | 'failed' | 'declined' | 'blocked' | (string & {})
+export type AgentErrorCode =
+  | 'invalid_input'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'stale_page'
+  | 'failed'
+  | 'declined'
+  | 'blocked'
+  | (string & {})
 
 export interface AgentError {
   code: AgentErrorCode

@@ -22,7 +22,7 @@ A result, not an exception:
 { "ok": false, "error": { "code": "invalid_input", "message": "Invalid input.", "issues": [{ "message": "Too small", "path": ["text"] }] } }
 ```
 
-Browsers replace a rejected tool call with a fixed "Tool execution failed." message, so actionmcp returns failures as values. The codes that the library uses are `invalid_input`, `unauthorized`, `failed`, `declined`, and `blocked`. A handler can return its own code with `throw new AgentToolError('not_found', 'There is no todo with that id.')`.
+Browsers replace a rejected tool call with a fixed "Tool execution failed." message, so actionmcp returns failures as values. The codes that the library uses are `invalid_input`, `unauthorized`, `forbidden`, `not_found`, `stale_page`, `failed`, `declined`, and `blocked`. `notFound()`, `forbidden()`, and `unauthorized()` in an action become `not_found`, `forbidden`, and `unauthorized`. A handler can return its own code with `throw new AgentToolError('not_found', 'There is no todo with that id.')`.
 
 ## Why does a dialog appear before a tool runs?
 

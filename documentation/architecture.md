@@ -188,7 +188,18 @@ Next.js dispatches Server Functions one at a time per client, so a tool call que
 
 When an action calls `redirect()`, Next.js navigates and the client Promise rejects with an error whose `digest` is `NEXT_REDIRECT;<type>;<url>;<status>;`. The client reads the URL and returns `{ ok: true, data: { navigatedTo: url } }`. The result is delivered even when the navigation unmounts the layout that registered the tool.
 
-`agent()` rethrows every error that carries a `digest`, so `redirect()` and `notFound()` keep their meaning inside a handler.
+`agent()` rethrows every error that carries a `digest`, so `redirect()`, `notFound()`, `forbidden()`, and `unauthorized()` reach Next.js. When a UI calls the action, they keep their meaning. When a tool calls it, the client turns them into results:
+
+| The action calls | The agent receives |
+|---|---|
+| `redirect()` | `{ ok: true, data: { navigatedTo } }` |
+| `notFound()` | `{ ok: false, error: { code: 'not_found' } }` |
+| `forbidden()` | `{ ok: false, error: { code: 'forbidden' } }` |
+| `unauthorized()` | `{ ok: false, error: { code: 'unauthorized' } }` |
+
+The page does not render the `not-found`, `forbidden`, or `unauthorized` file for a tool call.
+
+The client also recognizes two failures of the call itself. An action that the server no longer knows, after a new deployment, becomes `stale_page`. In production, Next.js replaces the message of a server error with a generic text and a `digest`, and the client returns `The tool failed.` instead of that text.
 
 ### The navigate tool
 

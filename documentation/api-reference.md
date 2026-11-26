@@ -57,8 +57,11 @@ type AgentResult<Data> =
 | Code | Source |
 |---|---|
 | `invalid_input` | The input did not match the schema. `issues` lists each problem. |
-| `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. |
-| `failed` | The handler threw, or the output did not match the `output` schema. |
+| `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. Also the result of `unauthorized()` from `next/navigation` in an action. Added in the browser in that case. |
+| `forbidden` | The action called `forbidden()`. Added in the browser. |
+| `not_found` | The action called `notFound()`. Added in the browser. |
+| `stale_page` | The server no longer knows the action, because the app was deployed again after the page loaded. Added in the browser. |
+| `failed` | The handler threw, or the output did not match the `output` schema. In production, a server error that reaches the browser has the generic message `The tool failed.` |
 | `declined` | The user cancelled the confirmation. Added in the browser. |
 | `blocked` | `onBeforeExecute` returned `false` or threw. Added in the browser. |
 

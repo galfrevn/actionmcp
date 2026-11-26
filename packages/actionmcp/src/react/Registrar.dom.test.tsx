@@ -203,6 +203,14 @@ describe('Registrar', () => {
     expect(document.querySelector('dialog')).toBeNull()
   })
 
+  it('reports notFound() in an action as the not_found code', async () => {
+    const action = vi.fn(async () =>
+      Promise.reject(Object.assign(new Error('NEXT_HTTP_ERROR_FALLBACK;404'), { digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })),
+    )
+    await render(<Registrar tools={[createTool({ confirm: 'never', action })]} />)
+    await expect((await execute('deleteAccount')).output).resolves.toMatchObject({ ok: false, error: { code: 'not_found' } })
+  })
+
   it('reports a redirect() as a navigation result', async () => {
     const action = vi.fn(async () => Promise.reject(Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;push;/done;307;' })))
     await render(<Registrar tools={[createTool({ confirm: 'never', action })]} />)
