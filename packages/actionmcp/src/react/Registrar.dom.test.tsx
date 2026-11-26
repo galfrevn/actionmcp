@@ -1,0 +1,281 @@
+import { StrictMode, act, type ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { succeed } from '../core/result'
+import type { SerializableToolDef } from '../core/types'
+import { loadPolyfill, type ModelContext } from '../core/webmcp'
+import { ConfirmDialog } from './Confirm'
+import type { ConfirmProps } from './context'
+import { AgentToolsProvider } from './Provider'
+import { Registrar } from './Registrar'
+
+let context: ModelContext
+let root: Root | undefined
+let container: HTMLElement
+
+const flush = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)))
+
+function createTool(overrides: Partial<SerializableToolDef> = {}): SerializableToolDef {
+  return {
+    name: 'deleteAccount',
+    description: 'Permanently delete the account.',
+    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
+    confirm: 'consequential',
+    action: vi.fn(async () => succeed({ deleted: true })),
+    ...overrides,
+  }
+}
+
+async function render(node: ReactNode): Promise<void> {
+  if (!root) {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+  }
+  await act(async () => root?.render(node))
+  await flush()
+}
+
+async function toolNames(): Promise<string[]> {
+  return (await context.getTools()).map((tool) => tool.name)
+}
+
+async function execute(name: string, input: object = {}): Promise<{ output: Promise<unknown> }> {
+  const tool = (await context.getTools()).find((candidate) => candidate.name === name)
+  if (!tool) throw new Error(`Tool ${name} is not registered`)
+  const output = context.executeTool(tool, input).then((serialized) => JSON.parse(serialized) as unknown)
+  await flush()
+  return { output }
+}
+
+function button(label: string): HTMLButtonElement {
+  const match = [...document.querySelectorAll('button')].find((element) => element.textContent === label)
+  if (!match) throw new Error(`No button labeled ${label}`)
+  return match
+}
+
+beforeAll(async () => {
+  Object.defineProperty(globalThis, 'isSecureContext', { value: true, configurable: true })
+  Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true })
+  HTMLDialogElement.prototype.showModal ??= function showModal(this: HTMLDialogElement) {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close ??= function close(this: HTMLDialogElement) {
+    this.removeAttribute('open')
+  }
+  const loaded = await loadPolyfill()
+  if (!loaded) throw new Error('The polyfill did not install.')
+  context = loaded
+})
+
+afterEach(async () => {
+  await act(async () => root?.unmount())
+  root = undefined
+  container?.remove()
+  await flush()
+})
+
+describe('Registrar', () => {
+  it('registers the tools and unregisters them on unmount', async () => {
+    await render(<Registrar tools={[createTool(), createTool({ name: 'listTodos' })]} />)
+    expect(await toolNames()).toEqual(['deleteAccount', 'listTodos'])
+    await act(async () => root?.unmount())
+    root = undefined
+    expect(await toolNames()).toEqual([])
+  })
+
+  it('registers each tool once under StrictMode', async () => {
+    await render(
+      <StrictMode>
+        <Registrar tools={[createTool()]} />
+      </StrictMode>,
+    )
+    expect(await toolNames()).toEqual(['deleteAccount'])
+  })
+
+  it('exposes the definition without internal fields', async () => {
+    const inputSchema = { type: 'object', properties: { id: { type: 'string' } } }
+    await render(<Registrar tools={[createTool({ title: 'Delete account', inputSchema, adapter: 'formdata' })]} />)
+    const [tool] = await context.getTools()
+    expect(tool).toMatchObject({
+      name: 'deleteAccount',
+      title: 'Delete account',
+      description: 'Permanently delete the account.',
+      inputSchema,
+      annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
+    })
+  })
+
+  it('keeps the registration when the same definitions render again', async () => {
+    const onChange = vi.fn()
+    await render(<Registrar tools={[createTool()]} />)
+    context.addEventListener('toolchange', onChange)
+    await render(<Registrar tools={[createTool()]} />)
+    expect(onChange).not.toHaveBeenCalled()
+    context.removeEventListener('toolchange', onChange)
+  })
+
+  it('calls the latest action after a re-render', async () => {
+    const first = createTool({ confirm: 'never' })
+    const second = createTool({ confirm: 'never', action: vi.fn(async () => succeed('second')) })
+    await render(<Registrar tools={[first]} />)
+    await render(<Registrar tools={[second]} />)
+    await expect((await execute('deleteAccount')).output).resolves.toEqual({ ok: true, data: 'second' })
+    expect(first.action).not.toHaveBeenCalled()
+  })
+
+  it('registers again when the definitions change', async () => {
+    await render(<Registrar tools={[createTool()]} />)
+    await render(<Registrar tools={[createTool({ name: 'renamed' })]} />)
+    expect(await toolNames()).toEqual(['renamed'])
+  })
+
+  it('blocks a consequential tool until a human allows it', async () => {
+    const tool = createTool()
+    await render(<Registrar tools={[tool]} />)
+    let settled = false
+    const execution = (await execute('deleteAccount', { id: 'u1' })).output.then((output) => {
+      settled = true
+      return output
+    })
+    const dialog = document.querySelector('dialog')
+    expect(dialog?.hasAttribute('open')).toBe(true)
+    expect(dialog?.textContent).toContain('deleteAccount')
+    expect(dialog?.textContent).toContain('Permanently delete the account.')
+    expect(dialog?.textContent).toContain('"id": "u1"')
+    expect(settled).toBe(false)
+    expect(tool.action).not.toHaveBeenCalled()
+    await act(async () => button('Allow').click())
+    await expect(execution).resolves.toEqual({ ok: true, data: { deleted: true } })
+    expect(tool.action).toHaveBeenCalledWith({ id: 'u1' })
+    expect(document.querySelector('dialog')).toBeNull()
+  })
+
+  it('does not run the action when the human cancels', async () => {
+    const tool = createTool()
+    await render(<Registrar tools={[tool]} />)
+    const execution = (await execute('deleteAccount')).output
+    await act(async () => button('Cancel').click())
+    await expect(execution).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('treats closing the dialog with Escape as a cancel', async () => {
+    const tool = createTool()
+    await render(<Registrar tools={[tool]} />)
+    const execution = (await execute('deleteAccount')).output
+    await act(async () => document.querySelector('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true })))
+    await expect(execution).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('declines pending confirmations when it unmounts', async () => {
+    const tool = createTool()
+    await render(<Registrar tools={[tool]} />)
+    const execution = (await execute('deleteAccount')).output
+    await act(async () => root?.unmount())
+    root = undefined
+    await expect(execution).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('shows one confirmation at a time', async () => {
+    await render(<Registrar tools={[createTool(), createTool({ name: 'removeMember' })]} />)
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    expect(document.querySelectorAll('dialog')).toHaveLength(1)
+    await act(async () => button('Allow').click())
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    await act(async () => button('Cancel').click())
+    await expect(second).resolves.toMatchObject({ ok: false })
+  })
+
+  it('runs a read-only tool without a dialog', async () => {
+    const tool = createTool({
+      name: 'listTodos',
+      annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false },
+      action: vi.fn(async () => succeed(['a'])),
+    })
+    await render(<Registrar tools={[tool]} />)
+    await expect((await execute('listTodos')).output).resolves.toEqual({ ok: true, data: ['a'] })
+    expect(document.querySelector('dialog')).toBeNull()
+  })
+
+  it('reports a redirect() as a navigation result', async () => {
+    const action = vi.fn(async () => Promise.reject(Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;push;/done;307;' })))
+    await render(<Registrar tools={[createTool({ confirm: 'never', action })]} />)
+    await expect((await execute('deleteAccount')).output).resolves.toEqual({ ok: true, data: { navigatedTo: '/done' } })
+  })
+})
+
+describe('AgentToolsProvider', () => {
+  it('uses the custom confirm component', async () => {
+    const AutoConfirm = ({ call, onConfirm }: ConfirmProps) => (
+      <button type="button" onClick={onConfirm}>
+        Approve {call.name}
+      </button>
+    )
+    const tool = createTool()
+    await render(
+      <AgentToolsProvider confirmComponent={AutoConfirm}>
+        <Registrar tools={[tool]} />
+      </AgentToolsProvider>,
+    )
+    const execution = (await execute('deleteAccount')).output
+    expect(document.querySelector('dialog')).toBeNull()
+    await act(async () => button('Approve deleteAccount').click())
+    await expect(execution).resolves.toMatchObject({ ok: true })
+  })
+
+  it('runs onBeforeExecute after the confirmation and onAfterExecute after the action', async () => {
+    const order: string[] = []
+    const tool = createTool({
+      confirm: 'never',
+      action: vi.fn(async () => {
+        order.push('action')
+        return succeed(1)
+      }),
+    })
+    const onBeforeExecute = vi.fn(() => {
+      order.push('before')
+      return true
+    })
+    const onAfterExecute = vi.fn(() => {
+      order.push('after')
+    })
+    await render(
+      <AgentToolsProvider onBeforeExecute={onBeforeExecute} onAfterExecute={onAfterExecute}>
+        <Registrar tools={[tool]} />
+      </AgentToolsProvider>,
+    )
+    await expect((await execute('deleteAccount', { id: 1 })).output).resolves.toEqual({ ok: true, data: 1 })
+    expect(order).toEqual(['before', 'action', 'after'])
+    expect(onBeforeExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'deleteAccount', input: { id: 1 }, source: 'agent' }))
+    expect(onAfterExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'deleteAccount' }), { ok: true, data: 1 })
+  })
+
+  it('blocks the call when onBeforeExecute returns false', async () => {
+    const tool = createTool({ confirm: 'never' })
+    await render(
+      <AgentToolsProvider onBeforeExecute={() => false}>
+        <Registrar tools={[tool]} />
+      </AgentToolsProvider>,
+    )
+    await expect((await execute('deleteAccount')).output).resolves.toMatchObject({ ok: false, error: { code: 'blocked' } })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+})
+
+describe('ConfirmDialog', () => {
+  it('labels the dialog with the tool title and description', async () => {
+    const call = { name: 'team.invite', input: { email: 'ana@acme.com' }, annotations: createTool().annotations, source: 'agent' as const }
+    await render(<ConfirmDialog call={call} title="Invite member" description="Invite a person." onConfirm={() => {}} onCancel={() => {}} />)
+    const dialog = document.querySelector('dialog')
+    const label = document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')
+    const description = document.getElementById(dialog?.getAttribute('aria-describedby') ?? '')
+    expect(label?.textContent).toContain('Invite member')
+    expect(description?.textContent).toContain('Invite a person.')
+    expect(dialog?.dataset.actionmcpConfirm).toBe('team.invite')
+  })
+})
