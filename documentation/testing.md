@@ -32,7 +32,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 
 | Dimension | What CI runs |
 |---|---|
-| Next.js and React | Integration on 16.4 with React 19.3 and on 16.2 with React 19.2. End-to-end on 16.4. A nightly, non-blocking job on `canary`. |
+| Next.js and React | Integration on 16.4 with React 19.3, on 16.2 with React 19.2.9, and on 16.1 and 16.0 with React 19.2.0. End-to-end on 16.4. A nightly, non-blocking job on `canary`. |
 | Bundler | Turbopack and webpack for every fixture |
 | Validators | Zod 4, Valibot with `@valibot/to-json-schema`, and ArkType |
 | Node.js | 22 and 24, for the unit tests and for the end-to-end tests |

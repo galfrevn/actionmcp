@@ -45,6 +45,10 @@ jobs:
             react: '19.3.1'
           - next: '16.2.12'
             react: '19.2.9'
+          - next: '16.1.7'
+            react: '19.2.0'
+          - next: '16.0.11'
+            react: '19.2.0'
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
