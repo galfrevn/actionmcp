@@ -122,7 +122,7 @@ test.describe('demo example: a public deployment with one list per visitor', () 
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   })
 
-  test('the chat route needs a started demo and limits the conversation', async ({ page, request }) => {
+  test('the chat route needs a started demo, limits the conversation, and accepts provider parts', async ({ page, request }) => {
     const signedOut = await request.post(`${url}api/chat`, { data: { messages: [], tools: [] } })
     expect(signedOut.status()).toBe(401)
 
@@ -138,5 +138,29 @@ test.describe('demo example: a public deployment with one list per visitor', () 
 
     const wordy = await postChat(page, { tools: [], messages: [message(0, 'a'.repeat(501))] })
     expect(wordy).toEqual({ status: 400, text: 'A message can have up to 500 characters.' })
+
+    const toolResult = {
+      type: 'dynamic-tool',
+      toolName: 'listTodos',
+      toolCallId: 'call-1',
+      state: 'output-available',
+      input: {},
+      output: { content: [{ type: 'text', text: '{"ok":true,"data":[]}' }] },
+    }
+    const providerPart = { type: 'custom', kind: 'anthropic.message_start', providerMetadata: { anthropic: { id: 'msg_1' } } }
+    const tools = [{ name: 'listTodos', description: 'List the todos.', inputSchema: { type: 'object' } }]
+    const status = await page.evaluate(
+      async (body) => {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        await response.body?.cancel()
+        return response.status
+      },
+      { tools, messages: [message(0), { id: 'a1', role: 'assistant', parts: [{ type: 'step-start' }, providerPart, toolResult] }] },
+    )
+    expect(status).toBe(200)
   })
 })

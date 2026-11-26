@@ -20,6 +20,11 @@ const INSTRUCTIONS =
 const USER_PART_TYPES = new Set(['text'])
 const ASSISTANT_PART_TYPES = new Set(['text', 'reasoning', 'step-start', 'dynamic-tool'])
 
+function withoutProviderParts(message: UIMessage): UIMessage {
+  if (message.role !== 'assistant') return message
+  return { ...message, parts: message.parts.filter((part) => part.type !== 'custom') }
+}
+
 function isSupportedMessage(message: UIMessage): boolean {
   if (message.role !== 'user' && message.role !== 'assistant') return false
   const allowed = message.role === 'user' ? USER_PART_TYPES : ASSISTANT_PART_TYPES
@@ -57,17 +62,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const validated = await safeValidateUIMessages({ messages, tools })
-  if (!validated.success || !validated.data.every(isSupportedMessage)) {
+  if (!validated.success) {
     return reject('Only text and browser tool results are supported.', 400)
   }
-  if (!validated.data.every(isShortUserMessage)) {
+  const conversation = validated.data.map(withoutProviderParts)
+  if (!conversation.every(isSupportedMessage)) {
+    return reject('Only text and browser tool results are supported.', 400)
+  }
+  if (!conversation.every(isShortUserMessage)) {
     return reject(`A message can have up to ${MAX_USER_TEXT_LENGTH} characters.`, 400)
   }
 
   const result = streamText({
     model: MODEL,
     instructions: INSTRUCTIONS,
-    messages: await convertToModelMessages(validated.data, { tools }),
+    messages: await convertToModelMessages(conversation, { tools }),
     tools,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     abortSignal: request.signal,

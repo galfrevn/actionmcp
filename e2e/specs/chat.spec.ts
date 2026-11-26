@@ -57,7 +57,7 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
     expect(response.status()).toBe(401)
   })
 
-  test('the route accepts reasoning parts from the model and rejects attachments', async ({ page }) => {
+  test('the route accepts reasoning and provider parts from the model and rejects attachments', async ({ page }) => {
     await open(page)
     const tools = [{ name: 'listTodos', description: 'List the todos.', inputSchema: { type: 'object' } }]
     const user = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'What is on my list?' }] }
@@ -83,6 +83,8 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
       output: { content: [{ type: 'text', text: '{"ok":true,"data":[]}' }] },
     }
     expect(await post([{ type: 'step-start' }, { type: 'reasoning', text: 'Read the list first.', state: 'done' }, toolResult])).toBe(200)
+    const providerPart = { type: 'custom', kind: 'anthropic.message_start', providerMetadata: { anthropic: { id: 'msg_1' } } }
+    expect(await post([{ type: 'step-start' }, providerPart, toolResult])).toBe(200)
     expect(await post([{ type: 'file', mediaType: 'image/png', url: 'https://example.com/a.png' }])).toBe(400)
   })
 
