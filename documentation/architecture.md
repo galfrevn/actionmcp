@@ -164,7 +164,8 @@ The Client Component registers the definitions on `document.modelContext` with o
 
 - The registration is keyed by the serialized definitions. A re-render of the Server Component with the same tools unregisters nothing.
 - The `execute` callback reads the latest Server Function reference from a ref.
-- If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`. Without either, it does nothing.
+- If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`.
+- If `document.modelContext` is missing and `polyfill` is not set, it checks again 250 ms, 1 s, and 4 s later, for a context that a browser extension installs after the page loads. After the last check it registers nothing.
 - It calls `waitForToolsUntil` when the browser has it.
 - If a name is already taken, the tool is registered with a `_2` suffix and a warning is logged in development.
 
