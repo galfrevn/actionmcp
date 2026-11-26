@@ -23,7 +23,7 @@
   "type": "module",
   "sideEffects": false,
   "bin": {
-    "actionmcp": "./dist/cli/bin.js"
+    "actionmcp": "dist/cli/bin.js"
   },
   "files": [
     "dist"
