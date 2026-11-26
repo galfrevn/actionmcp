@@ -1,118 +1,103 @@
 # Architecture
 
-## Overview
+actionmcp has two halves. A build step finds the tools and writes a registry. A runtime registers the tools in the browser and runs them through the Server Function RPC.
 
 ```
  BUILD / DEV (Node)                                    RUNTIME
  ┌───────────────────────────────────────────────┐   ┌──────────────────────────────────────────────────────┐
  │  analyzer                                     │   │  <AgentTools/>  (Server Component)                   │
- │  ├─ scan (oxc-parser): 'use server', exports, │   │  ├─ import registry (alias actionmcp/registry        │
+ │  ├─ scan (oxc-parser): 'use server', exports, │   │  ├─ imports the registry (alias actionmcp/registry   │
  │  │   agent(), @agent JSDoc, app/ routes       │   │  │   → .agent-tools/registry.ts)                     │
- │  ├─ types (TS 6 + ts-json-schema-generator)   │   │  ├─ resolve inputSchema:                             │
- │  │   only for @agent tools                    │   │  │    Standard JSON Schema ~standard.jsonSchema      │
- │  └─ diagnostics ATxxx                         │   │  │    or embedded JSON (JSDoc path)                  │
- │  generator                                    │   │  ├─ filter include/exclude/prefix                    │
- │  ├─ .agent-tools/registry.ts  (server-only)   │   │  └─ serializable props + Server Function refs        │
- │  └─ .agent-tools/manifest.json                │   │                     │                                │
- │  cli: generate | inspect | doctor             │   │                     ▼                                │
- │  config: withAgentTools() → watch + alias     │   │  <Registrar/> (Client Component)                     │
- │                                               │   │  ├─ detects document.modelContext (optional polyfill)│
- │                                               │   │  ├─ registerTool(def, {signal, exposedTo})           │
- │                                               │   │  ├─ waitForToolsUntil(registrations)                 │
+ │  ├─ types (TypeScript 6): only for @agent     │   │  ├─ resolves each input schema to JSON Schema        │
+ │  └─ diagnostics ATxxx                         │   │  ├─ filters with include / exclude / prefix          │
+ │  generator                                    │   │  └─ passes definitions + Server Function references  │
+ │  ├─ .agent-tools/registry.ts  (server-only)   │   │                     │                                │
+ │  └─ .agent-tools/manifest.json                │   │                     ▼                                │
+ │  cli: generate | inspect | doctor             │   │  <Registrar/> (Client Component)                     │
+ │  config: withAgentTools() → watch + alias     │   │  ├─ finds document.modelContext (optional polyfill)  │
+ │                                               │   │  ├─ registerTool(definition, { signal, exposedTo })  │
  │                                               │   │  ├─ execute → confirm? → action(input)               │
- │                                               │   │  │   (native Server Actions RPC) → normalize         │
+ │                                               │   │  │   (native Server Function RPC) → result           │
  │                                               │   │  └─ unmount → abort() → unregister                   │
  └───────────────────────────────────────────────┘   └──────────────────────────────────────────────────────┘
-Consumers: ChatGPT Desktop (Site tools) · Chrome OT · Edge OT · agent-browser · in-app chat (AI SDK)
 ```
 
-## Repo layout
+## Repository layout
 
 ```
 actionmcp/
 ├─ packages/
 │  └─ actionmcp/
 │     ├─ src/
-│     │  ├─ core/            # framework-agnostic (ADR-008): types, names, schema, results, execution, WebMCP adapter
-│     │  │  ├─ webmcp.ts     # thin layer over document.modelContext (feature detection, register, polyfill)
-│     │  │  ├─ names.ts      # name validation and reservation
-│     │  │  ├─ schema.ts     # Standard JSON Schema → JSON Schema draft-2020-12
-│     │  │  ├─ result.ts     # AgentResult, normalization, errors
-│     │  │  └─ execute.ts    # confirmation, hooks, adapters, cancellation
+│     │  ├─ core/            # framework-agnostic: types, names, schema, results, execution, WebMCP layer
 │     │  ├─ server/          # agent(), tool(), defineAgentTools(), createRegistry(), adapters
-│     │  ├─ react/           # AgentTools (RSC), Registrar, Provider, Confirm, Devtools
-│     │  ├─ next/            # navigate tool, redirect handling, recorded config
+│     │  ├─ react/           # AgentTools (Server Component), Registrar, Provider, Confirm, Devtools
+│     │  ├─ next/            # navigate tool, redirect handling
 │     │  ├─ analyzer/        # scan, explicit registry, routes, types, diagnostics
-│     │  ├─ generator/       # emits registry.ts and manifest.json; watch mode
+│     │  ├─ generator/       # registry.ts and manifest.json, watch mode
 │     │  ├─ cli/             # generate | inspect | doctor
 │     │  └─ config.ts        # withAgentTools()
 │     └─ package.json        # exports: ".", "./server", "./client", "./config", "./registry"
-├─ examples/                 # basic (path A), formdata and safe-action (path B), jsdoc (path C), chat (AI SDK)
-├─ fixtures/                 # minimal Next 16 apps for integration and e2e tests
-├─ e2e/                      # Playwright specs, run with the polyfill and with native WebMCP
-├─ tests/                    # integration (next build) and packed-tarball tests
+├─ examples/                 # one app per way to define tools, and an in-app chat
+├─ fixtures/                 # minimal Next.js apps for integration and end-to-end tests
+├─ e2e/                      # Playwright specs
+├─ tests/                    # integration and packed-tarball tests
 ├─ bench/                    # demo app and benchmark harness
 └─ documentation/
 ```
 
-The monorepo uses pnpm and turbo. v0.1 publishes a single package and separates `core/` by convention. An oxlint rule and `src/core/isolation.test.ts` enforce the separation ([ADR-008](decisions.md#adr-008-framework-agnostic-core-one-package-in-v01)).
+`src/core` imports nothing from `next`, `react`, or the other folders. An oxlint rule and `src/core/isolation.test.ts` enforce this.
 
-## Modules
+## Analyzer
 
-### 1. Analyzer (Node, build/dev)
+Input: the `withAgentTools()` options. Output: the list of tools, the route table, and the diagnostics.
 
-Input: `AgentToolsConfig`. Output: an in-memory `AnalysisResult` and the diagnostics.
+1. It walks the `scan` globs and skips `node_modules`, `.next`, and the output folder. It parses, with `oxc-parser`, only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`.
+2. In each parsed file it looks for:
+   - exported `agent()` calls, resolving the import from `actionmcp/server` and its aliases;
+   - exported functions whose JSDoc has the `@agent` tag, when `jsdoc` is enabled.
+3. It reads the registry file (`agent-tools.ts`) statically to list its tools and check their literal options. A registry that it cannot read is an error, so that `inspect` always shows every tool.
+4. It scans `app/` to build the route table for the [navigate tool](#the-navigate-tool).
 
-**Quick scan** (`oxc-parser`, no type checker):
+An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
 
-1. Walks the `scan` globs and skips `node_modules`, `.next`, and `outDir`. It parses only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`.
-2. For each parsed file:
-   - Looks for `export const X = agent(` (imported from `actionmcp/server`, resolving the import alias) → `kind: 'agent'`.
-   - Looks for exported functions whose JSDoc contains `@agent` → `kind: 'jsdoc'` (Path C, experimental).
-3. If `registry` is set (Path B), reads the file statically to list its tools and to check their literal options. The values that the runtime uses still come from the module itself. A registry that the analyzer cannot read is an error (`AT007`), so that `inspect` always shows every tool.
-4. Scans `app/` to build the [route table](#tool-navigate). The manifest lists the `navigate` tool when a layout uses `<AgentTools navigate />`.
-5. An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
+For `@agent` tools, the analyzer creates a TypeScript program with its own TypeScript 6 and the project's `tsconfig.json`. `ts-json-schema-generator` produces the schema of the first parameter, with property descriptions from the JSDoc of each property. The result is cached in `.agent-tools/cache/types.json` by a hash of the file content and the `tsconfig`. A change in a type that another file declares does not invalidate the cache. Delete the cache file in that case.
 
-**Types** (only for `kind: 'jsdoc'`, Path C, experimental):
+Every diagnostic has a code, a file, a line, a column, and a suggested fix. The codes are in the [API reference](api-reference.md#diagnostics).
 
-- Creates a TypeScript `Program` with `typescript@6.0.x` pinned as its own dependency. Native TS 7 has no stable JS API (see [research.md](research.md#5-schema-inference)). Uses the user's `tsconfig.json`.
-- `ts-json-schema-generator` produces the schema for the **first parameter**. If a parameter is `FormData`, or the tag has the `formdata` modifier, it emits `AT101`, suggests Path B, and selects a FormData adapter by the number of parameters.
-- Property descriptions come from the JSDoc of each property in the type.
-- Caches by a hash of the file content and the `tsconfig` in `outDir/cache/types.json`, so `--watch` is incremental. A change in a type that another file declares does not invalidate the cache. Delete the cache file in that case.
+## Generator
 
-**Diagnostics:** see the table in [spec.md](spec.md#cli). Every diagnostic includes `file:line:col` and a suggested `fix`.
+The generator writes two files to the output folder, `.agent-tools/` by default. Both are deterministic: two runs over the same sources produce identical bytes, and a file is rewritten only when its content changes.
 
-### 2. Generator
-
-Writes two files to `outDir` (default `.agent-tools/`). Add the folder to `.gitignore`, or commit `manifest.json` so that pull requests show changes to the exposed tools. Both files are deterministic: two runs over the same sources produce identical bytes, and a file is rewritten only when its content changes.
-
-**`registry.ts`** (server-only). Example output. The `jsdoc` block is Path C and experimental:
+`registry.ts` is server-only:
 
 ```ts
 // @generated by actionmcp. Do not edit.
 import 'server-only'
 import { createRegistry } from 'actionmcp/server'
-import * as m0 from '../app/todos/actions'
-import * as m1 from '../app/projects/actions'
+import * as m0 from '../app/projects/actions'
+import * as m1 from '../app/todos/actions'
 import explicit from '../agent-tools'
 
 export default createRegistry({
-  agent: { addTodo: m0.addTodo, listTodos: m0.listTodos },
+  agent: { addTodo: m1.addTodo, listTodos: m1.listTodos },
   jsdoc: {
     renameProject: {
-      action: m1.renameProject,
+      action: m0.renameProject,
       description: 'Rename the current project.',
       inputSchema: { type: 'object', properties: { projectId: { type: 'string' }, name: { type: 'string' } }, required: ['projectId', 'name'] },
-      annotations: { consequentialHint: true },
+      annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
       validated: false,
     },
   },
   explicit,
-  routes: [/* RouteEntry[] only when navigate is in use */],
+  routes: [{ pattern: '/', params: [] }],
 })
 ```
 
-**`manifest.json`**: consumed by `inspect`, `doctor`, the generated documentation, and the tests. It is stable and versioned:
+A tool with an error-level diagnostic is left out of the registry.
+
+`manifest.json` lists every tool for `inspect`, `doctor`, and code review:
 
 ```ts
 interface Manifest {
@@ -127,39 +112,33 @@ interface Manifest {
     annotations: { readOnlyHint: boolean; consequentialHint: boolean; untrustedContentHint: boolean }
     confirm: 'always' | 'consequential' | 'never'
     adapter?: 'formdata' | 'form' | 'safe-action'
-    validated: boolean                    // true when actionmcp validates the input before the handler
-    diagnostics: string[]                 // ATxxx codes
+    validated: boolean
+    diagnostics: string[]
   }>
   routes: RouteEntry[]
 }
 ```
 
-**Why codegen and not a compiler plugin:** see [ADR-001](decisions.md#adr-001-codegen-instead-of-a-compiler-plugin). In short:
+`validated` is `true` when actionmcp validates the input before the handler runs.
 
-- Turbopack does not support webpack plugins, and loaders transform one file at a time.
-- We need a view of the whole project (which tools exist) and an inspectable artifact.
-- Codegen is a known pattern in Next: `next typegen` and `.next/types`.
+## `withAgentTools()`
 
-### 3. `withAgentTools()` (config)
-
-- Runs `generate` once when the config loads during `next build`. If there is an `AT0xx` error, it aborts the build with a clear message.
-- In `next dev` it runs `generate` once and then watches the scan roots in the same process (the pattern used by contentlayer, velite, and others). Next.js replaces the server process on a config restart, so the watcher does not duplicate (spike SP4).
-- Adds `turbopack.resolveAlias['actionmcp/registry'] = './.agent-tools/registry.ts'`, and the equivalent for webpack. This lets `<AgentTools />` import the registry without props. The alias resolves for an import inside `node_modules/actionmcp` with both bundlers (spike SP3).
-- Without `withAgentTools()`: `<AgentTools registry={registry} />` with a manual import (documented escape hatch). Without the alias, `actionmcp/registry` resolves to an empty registry that ships with the package.
+- During `next build` it runs the generator once. An error-level diagnostic stops the build with the file and the line.
+- During `next dev` it runs the generator once and then watches the scan roots in the same process. Next.js replaces the server process when the config changes, so the watcher does not duplicate.
+- It sets `turbopack.resolveAlias['actionmcp/registry']` and the webpack `resolve.alias` equivalent, so `<AgentTools />` imports the generated registry without props. Without the alias, `actionmcp/registry` resolves to an empty registry that ships with the package.
 - It records its options so that the CLI can read them from `next.config`.
 
-### 4. Runtime: `<AgentTools />` (RSC) and `<Registrar />` (client)
+## Runtime
 
-**RSC:**
+### `<AgentTools />`
 
-1. `import registry from 'actionmcp/registry'`.
-2. For each tool, computes the serializable definition:
-   - For `agent`/`explicit`: reads the metadata attached to the function (symbol `AGENT_META`) and calls `schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })`.
-   - For `jsdoc`: uses the embedded JSON.
-   - Caches the result at module level, because it is deterministic.
-3. Applies `include`/`exclude`/`prefix` and validates names (error in dev, warning in prod).
-4. Renders `<meta http-equiv="origin-trial" content={token} />` if there is a token. React 19 hoists it to `<head>`.
-5. Renders `<Registrar tools={defs} navigate={routes?} polyfill exposedTo />`. Each `def.action` is a reference to the Server Function. React allows passing it as a prop from a Server Component to a Client Component.
+The Server Component:
+
+1. imports the registry;
+2. computes each definition once per registry. For `agent()` and `tool()` it reads the options and calls `schema['~standard'].jsonSchema.input({ target: 'draft-2020-12' })`. For `@agent` it uses the schema that the generator embedded;
+3. applies `include`, `exclude`, and `prefix`, and checks the names;
+4. renders the origin trial `<meta>` if there is a token. React hoists it to `<head>`;
+5. renders the client `Registrar` with the definitions. Each definition carries its Server Function reference, which React can pass from a Server Component to a Client Component.
 
 ```ts
 interface SerializableToolDef {
@@ -171,124 +150,112 @@ interface SerializableToolDef {
   annotations: { readOnlyHint: boolean; consequentialHint: boolean; untrustedContentHint: boolean }
   confirm: 'always' | 'consequential' | 'never'
   adapter?: 'formdata' | 'form' | 'safe-action'
-  action: (...args: never[]) => Promise<unknown>   // server reference
+  action: (...args: never[]) => Promise<unknown>
 }
 ```
 
-**Client (`Registrar`):**
+### `Registrar`
 
-```ts
-useEffect(() => {
-  const mc = document.modelContext ?? (polyfill ? await loadPolyfill() : undefined)
-  if (!mc) return                                   // silent no-op; Devtools shows "WebMCP unavailable"
-  const ac = new AbortController()
-  const registrations = defs.map((def) =>
-    mc.registerTool(
-      { name, title, description, inputSchema, outputSchema, annotations,
-        execute: (input, { signal }) => runTool(def, input, signal, hooks) },
-      { signal: ac.signal, exposedTo },
-    ),
-  )
-  mc.waitForToolsUntil?.(Promise.allSettled(registrations))   // feature-detect: added to the spec on 2026-11-24
-  return () => ac.abort()
-}, [defsKey])
-```
+The Client Component registers the definitions on `document.modelContext` with one `AbortController`, and aborts it on unmount. That is how tools follow the layout that mounts them.
 
-The block above is a sketch. The implementation is `src/react/useAgentTools.tsx` and `src/core/webmcp.ts`.
+- The registration is keyed by the serialized definitions. A re-render of the Server Component with the same tools unregisters nothing.
+- The `execute` callback reads the latest Server Function reference from a ref.
+- If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`. Without either, it does nothing.
+- It calls `waitForToolsUntil` when the browser has it.
+- If a name is already taken, the tool is registered with a `_2` suffix and a warning is logged in development.
 
-The registration is keyed by the serialized definitions, so a re-render of the Server Component with the same tools does not unregister anything. The `execute` callback reads the latest Server Function reference from a ref.
+### Executing a tool
 
-`executeTool` (`src/core/execute.ts`):
+`src/core/execute.ts` runs these steps for each call:
 
-1. **Confirmation:** if `confirm === 'always'`, or if it is `'consequential'` and the tool is consequential, shows the `Confirm` component. By default this is an accessible native `<dialog>` with the name, the description, and the formatted input. The focus starts on "Cancel". Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
-2. Runs `onBeforeExecute` from `AgentToolsProvider`, if present. If it returns `false`, the tool returns `{ ok: false, error: { code: 'blocked' } }`.
-3. **Adapter:** with `formdata`, converts the object to `FormData` (arrays as repeated keys, `true` as `'on'`, `false` omitted) and calls `action(undefined, formData)`. With `form`, it calls `action(formData)`. With `safe-action`, it unwraps the result.
-4. Calls the Server Function. This is Next's native RPC: a POST with the encrypted ID, the origin check, and an RSC response that **revalidates the UI on its own**.
-5. **Normalization:** every outcome becomes one envelope ([ADR-015](decisions.md#adr-015-tool-failures-are-results-not-rejections)).
-   - An `AgentResult` passes through.
-   - `{ serverError }` becomes `failed`, `{ validationErrors }` becomes `invalid_input` with issues, and `{ error: string }` (`ActionState` style) becomes `failed`.
-   - Anything else becomes `{ ok: true, data }`, converted to JSON-safe values.
-   - A thrown error becomes `failed`, except a `redirect()`, which becomes a navigation result.
-6. **Cancellation:** if `signal` aborts, the call rejects with `AbortError` and an open confirmation closes. **Server Actions in flight cannot be cancelled.** This is documented as a limitation.
+1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
+2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`.
+3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
+4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
+5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
+6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. A Server Function in flight cannot be cancelled.
 
-**Sequential dispatch:** Next runs Server Actions one at a time per client ([research.md](research.md#4-nextjs)). Tools queue behind other actions, including the UI's. This is documented. In phase 2, `readOnly` tools are added through GET route handlers.
+Next.js dispatches Server Functions one at a time per client, so a tool call queues behind other actions, including the ones the UI starts.
 
-### Redirect and navigation
+### Redirects
 
-Spike SP2 measured the behavior on Next.js 16.4.6:
+When an action calls `redirect()`, Next.js navigates and the client Promise rejects with an error whose `digest` is `NEXT_REDIRECT;<type>;<url>;<status>;`. The client reads the URL and returns `{ ok: true, data: { navigatedTo: url } }`. The result is delivered even when the navigation unmounts the layout that registered the tool.
 
-- If the action calls `redirect()`, Next navigates on the client and the action's Promise rejects with an error whose `digest` is `NEXT_REDIRECT;<type>;<url>;<status>;`.
-- The client reads the URL from the digest and returns `{ ok: true, data: { navigatedTo: url } }`. The result is delivered even when the navigation unmounts the segment that registered the tool.
-- `agent()` rethrows every error that carries a `digest`, so `redirect()`, `notFound()`, and similar signals keep their meaning inside a handler.
-- The root layout does not unmount on navigation, so global tools survive. Segment tools re-register when the user returns, and consumers receive `toolchange`.
+`agent()` rethrows every error that carries a `digest`, so `redirect()` and `notFound()` keep their meaning inside a handler.
 
-### Tool `navigate`
+### The navigate tool
 
-Generated from `app/`:
+The route table comes from `app/`:
 
-- Ignores route groups `(x)`, private folders `_x`, slots `@x`, intercepting routes `(.)x`, `route.ts`, and `api/`.
+- Route groups `(x)` are removed from the path.
+- Private folders `_x`, slots `@x`, intercepting routes `(.)x`, route handlers, and `app/api` are ignored.
 - Dynamic segments `[id]`, `[...slug]`, and `[[...slug]]` become parameters.
 
 ```ts
-interface RouteEntry { pattern: string; params: string[]; catchAll?: string; optionalCatchAll?: string; title?: string }
-
-// Registered tool:
-{
-  name: 'navigate',
-  description: 'Navigate this app to one of its pages. Available tools may change after navigating.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      route: { type: 'string', enum: ['/', '/todos', '/projects/[id]', /* … */] },
-      params: { type: 'object', additionalProperties: { type: 'string' } },
-      query: { type: 'object', additionalProperties: { type: 'string' } },
-    },
-    required: ['route'],
-  },
-  annotations: { readOnlyHint: false, consequentialHint: false },
+interface RouteEntry {
+  pattern: string
+  params: string[]
+  catchAll?: string
+  optionalCatchAll?: string
+  title?: string
+  staticParams?: boolean
 }
 ```
 
-- Runs `router.push(href)` and returns `{ ok: true, data: { url } }` immediately. An unknown route or a missing parameter returns `invalid_input` and does not navigate.
-- Limited by `navigate.routes` (globs). By default, only static routes and dynamic routes whose page exports `generateStaticParams` are included ([ADR-016](decisions.md#adr-016-default-routes-of-the-navigate-tool)).
-- A `RouteEntry` also carries `staticParams?: true` and, when the page exports a literal `metadata.title`, `title`.
+The tool's input schema lists the allowed patterns as an enum. The tool builds the URL from `params` and `query`, calls `router.push()`, and returns `{ ok: true, data: { url } }`. It accepts only a route from its enum.
 
 ### Reserved names
 
-`snapshot`, `act`, `query` (UI SDK); `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route` (Next dev tools, PR #98443); `navigate` (ours, unless overridden).
-
-If a name collides at runtime (`registerTool` rejects with `InvalidStateError`), the tool is registered with a `_2` suffix, and the collision is logged in dev. `fixtures/coexist` covers this. Coexisting with Shopify tools (`get_cart`, …) is the user's responsibility, through `prefix`.
+`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, and `navigate`. Other libraries and Next.js development tools use the first seven.
 
 ### Devtools
 
-`<AgentToolsDevtools />` renders only when `process.env.NODE_ENV === 'development'`. It is a floating button with a panel:
+`<AgentToolsDevtools />` renders only when `NODE_ENV` is `development`, and its panel is loaded lazily. The panel reads the tools with `getTools()`, runs them with `executeTool()`, and subscribes to the calls that actionmcp executes.
 
-- registered tools (via `getTools()`, both ours and third-party);
-- the schema and annotations of each tool;
-- a JSON form for `executeTool()`;
-- call history of actionmcp tools with input, result, duration, and whether a confirmation was shown;
-- WebMCP status: native, polyfill, or unavailable.
+## Design decisions
 
-We recommend the Model Context Tool Inspector extension for Chrome.
+### Code generation instead of a compiler plugin
 
-### In-app chat (AI SDK)
+The registry needs a view of the whole project. Turbopack does not run webpack plugins, loaders see one file at a time, and SWC plugins are WASM modules tied to a compiler version. A separate generation step gives the same output with Turbopack and with webpack, and leaves a manifest that people can inspect and review. The cost is a watcher in development and an alias for the registry. The `registry` prop of `<AgentTools />` works without the alias.
 
-The example in `examples/chat` replicates the official pattern ([research.md](research.md#ai-sdk)):
+### Standard Schema, and TypeScript types as a fallback
 
-- **Client:** `createMCPClient({ transport: new Experimental_WebMCPTransport({ modelContext: document.modelContext }) })`, `listTools()` in `prepareSendMessagesRequest`, and `onToolCall` → `callTool` → `addToolOutput`.
-- **Server:** `createMCPTools(definitions)` → `streamText`. Validate the count (≤32) and the format, and reject attachments.
-- **Requires `polyfill`** in browsers without native WebMCP support.
-- Optional v0.2 helper: `useAgentToolsChat()`, which encapsulates that boilerplate.
+`agent()` and `tool()` take the validator as a value. The JSON Schema comes from Standard JSON Schema at runtime on the server, and `agent()` validates with the same object, so the schema that the agent sees and the validation cannot drift apart. Any validator that implements the standard works, and actionmcp never parses validator source code. Zod 3 does not implement Standard JSON Schema.
 
-## Compatibility with Next PR #98443
+The `@agent` tag infers the schema from TypeScript types instead and does not validate at runtime. It is experimental and off by default.
 
-- We use different names and do not change `debugging: true`.
-- If Next later adds native "application tools," the plan is for `<AgentTools />` to delegate to that API. For that reason, the `SerializableToolDef` format imitates the spec's `ModelContextTool`, without exotic fields.
-- This keeps the design easy to propose upstream: the shape is small enough for Next.js to adopt.
+### Opt-in exposure
 
-## Open architecture decisions
+A function is a tool only if it is wrapped in `agent()`, listed with `tool()`, or tagged with `@agent`. There is no mode that exposes every Server Function, because exposure is a security decision that a default cannot make.
 
-1. **Resolved.** The `confirm` option defaults to `'consequential'`, so the in-page dialog runs before any consequential tool ([ADR-012](decisions.md#adr-012-confirmation-for-consequential-tools-by-default)).
-2. **Resolved.** The registration layer is owned and thin ([ADR-010](decisions.md#adr-010-client-registration-layer-owned-and-thin)).
-3. **Resolved.** `navigate` lists static routes and routes with `generateStaticParams` by default ([ADR-016](decisions.md#adr-016-default-routes-of-the-navigate-tool)).
-4. **Resolved.** v0.1 supports Next.js 16.x only. Next.js 15.5 (React 19.0 and 19.1) is out of scope and will be reconsidered after v0.1 ([ADR-013](decisions.md#adr-013-supported-nextjs-versions)).
+### Execution through the Server Function RPC
+
+The browser calls the Server Function reference, the same mechanism that the UI uses. There is no dispatcher endpoint, so a tool has exactly the permissions of the user, and the UI revalidates after an agent action with no extra code. The costs are sequential dispatch and no cancellation of an action in flight. Every exposed action is referenced by the client, so Next.js keeps it in the client's list of actions.
+
+### Registry in a Server Component, scope by composition
+
+Schemas are evaluated on the server, so the validator never reaches the client bundle. Only JSON and Server Function references cross to the client. Tools exist while the `<AgentTools />` that includes them is mounted, which follows the layouts that the App Router already resolves.
+
+### Failures are results, not rejections
+
+Browsers replace every rejected `execute` with `OperationError: Tool execution failed.`. The name and the message of the thrown error do not reach the agent. actionmcp therefore resolves with an envelope for every outcome, so an agent can read validation issues and can tell a declined confirmation from a crash. `execute` rejects only when the consumer cancels the call. When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
+
+### Confirmation by default
+
+No agent guarantees its own confirmation for consequential tools, so the page asks. In agents that also confirm, a user can see two confirmations. `confirm: 'never'` turns the page dialog off for one tool and produces the `AT103` warning.
+
+### Default routes of the navigate tool
+
+`navigate` lists the routes without dynamic segments, plus the dynamic routes whose page exports `generateStaticParams`. A dynamic route gives the agent a free-form parameter, so it needs an explicit glob in `navigate.routes`.
+
+### `agent()` validates its output
+
+When a tool declares an `output` schema, `agent()` validates the handler's return value on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, removes undeclared fields. If validation fails, the tool returns a `failed` result and none of the data. For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
+
+### A thin, owned registration layer
+
+`src/core/webmcp.ts` is a small layer over `document.modelContext` with feature detection for each optional method. It registers a batch of tools with one signal, wraps `execute`, and loads the polyfill on demand. The types come from `webmcp-types`.
+
+### Supported versions
+
+actionmcp supports the App Router on Next.js 16.x and React 19.2 or later.
