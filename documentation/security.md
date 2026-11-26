@@ -31,6 +31,7 @@ The guiding principle: exposing a Server Function as a tool must not add attack 
 - [ ] The action returns only the fields that the caller needs. With `agent()`, declare an `output` schema to enforce this.
 - [ ] `untrustedOutput: true` is set if the output can contain text written by users or third parties.
 - [ ] The description says what the tool does, its side effects, and what it returns. An optimistic description misleads the agent and the person who reads the confirmation dialog.
+- [ ] The field descriptions and titles in the schemas are literals in your source code, not values from a database or a request.
 - [ ] The input asks for identifiers and domain values, not for personal data that the handler does not need.
 - [ ] `confirm: 'never'` is not set on a consequential tool, unless you have decided to rely on the agent's own confirmation.
 
@@ -79,7 +80,7 @@ With `defineAgentTools()` and with `@agent`, actionmcp calls your action as it i
 | T8 | Over-parameterization | Tools ask for personal data that the agent fills in from its context | Request only identifiers and domain values. `AT107` flags unused personal fields. |
 | T9 | Sensitive data in the output | The action returns full database records | `agent()` validates the return value against the `output` schema and returns the validated value, so a validator that strips unknown keys removes undeclared fields. |
 | T10 | Quota abuse | An agent in a loop calls an expensive tool | Rate limiting inside the action. actionmcp does not limit calls. |
-| T11 | Injection through tool metadata | Descriptions or schemas built from untrusted content | Descriptions come only from source code. A description that is not a literal is an error (`AT005`) and stops the build. |
+| T11 | Injection through tool metadata | Descriptions or schemas built from untrusted content | The `name` and the `description` of a tool come only from source code. One that is not a literal is an error (`AT001`, `AT005`) and stops the build. actionmcp does not check the schemas: the field descriptions and titles come from your validator when the app renders. Keep them literal too, because the agent reads them and the confirmation dialog shows the titles. |
 | T12 | The polyfill as a false sense of coverage | A developer believes that native agents see the polyfill's tools | The devtools panel shows "native" or "polyfill". Native agents do not see tools that the polyfill registers. |
 
 ## How this is tested
