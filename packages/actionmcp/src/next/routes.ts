@@ -11,6 +11,8 @@ export interface NavigateInput {
   query?: Record<string, string>
 }
 
+const DOT_SEGMENTS = new Set(['.', '..'])
+
 export const NAVIGATE_DESCRIPTION =
   'Navigate this app to one of its pages. Available tools may change after navigating.'
 
@@ -49,16 +51,16 @@ export function buildHref(routes: readonly RouteEntry[], input: NavigateInput): 
 function resolveSegment(segment: string, params: Record<string, string>): string[] {
   const optionalCatchAll = /^\[\[\.\.\.(.+)\]\]$/.exec(segment)?.[1]
   if (optionalCatchAll !== undefined) {
-    return splitPath(params[optionalCatchAll] ?? '')
+    return splitPath(optionalCatchAll, params[optionalCatchAll] ?? '')
   }
   const catchAll = /^\[\.\.\.(.+)\]$/.exec(segment)?.[1]
   if (catchAll !== undefined) {
-    const parts = splitPath(requireParam(params, catchAll))
+    const parts = splitPath(catchAll, requireParam(params, catchAll))
     if (parts.length === 0) throw new RangeError(`Missing route parameter "${catchAll}".`)
     return parts
   }
   const dynamic = /^\[(.+)\]$/.exec(segment)?.[1]
-  return [dynamic === undefined ? segment : encodeURIComponent(requireParam(params, dynamic))]
+  return [dynamic === undefined ? segment : encodeSegment(dynamic, requireParam(params, dynamic))]
 }
 
 function requireParam(params: Record<string, string>, name: string): string {
@@ -69,6 +71,16 @@ function requireParam(params: Record<string, string>, name: string): string {
   return value
 }
 
-function splitPath(value: string): string[] {
-  return value.split('/').filter(Boolean).map(encodeURIComponent)
+function splitPath(name: string, value: string): string[] {
+  return value
+    .split('/')
+    .filter(Boolean)
+    .map((part) => encodeSegment(name, part))
+}
+
+function encodeSegment(name: string, value: string): string {
+  if (DOT_SEGMENTS.has(value)) {
+    throw new RangeError(`The route parameter "${name}" cannot contain the path segment "${value}".`)
+  }
+  return encodeURIComponent(value)
 }

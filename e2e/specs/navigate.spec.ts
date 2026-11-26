@@ -78,4 +78,18 @@ test.describe('navigate fixture: typed navigation tool', () => {
     await expect(page.getByRole('heading', { name: 'Docs guides / getting-started' })).toBeVisible()
     await expectTools(page, ['navigate'])
   })
+
+  test('rejects parameters that would resolve to a route outside the list', async ({ page }) => {
+    await page.goto(fixtureUrl('navigate', '/projects'))
+    await expectTools(page, ['navigate', 'projects.navigate'])
+    expect(await callTool(page, 'projects.navigate', { route: '/docs/[...path]', params: { path: '../login' } })).toEqual({
+      ok: false,
+      error: { code: 'invalid_input', message: 'The route parameter "path" cannot contain the path segment "..".' },
+    })
+    expect(await callTool(page, 'projects.navigate', { route: '/projects/[id]', params: { id: '..' } })).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_input' },
+    })
+    await expect(page).toHaveURL(fixtureUrl('navigate', '/projects'))
+  })
 })

@@ -73,7 +73,7 @@ With `defineAgentTools()` and with `@agent`, actionmcp calls your action as it i
 | T4 | Privilege escalation | The tool runs with more permissions than the user | Not possible by design: the tool calls the action from the user's browser, with its cookies, through the standard RPC. There is no service token and no custom endpoint. |
 | T5 | Missing authorization in the action | The action trusts IDs in its input | The action's responsibility. `AT105` flags a handler without a call to a configured auth function. |
 | T6 | Cross-site requests | Another site forces the call | The `Origin` check of Server Functions applies. `exposedTo` applies only if you set it. |
-| T7 | Accidental exposure | An internal action ends up as a tool | Opt-in only. `inspect` and `manifest.json` show the full list. A registry file that cannot be read statically is an error (`AT007`). |
+| T7 | Accidental exposure | An internal action ends up as a tool | Opt-in only. `inspect` and `manifest.json` show the full list. A registry file that cannot be read statically is an error (`AT007`). The `navigate` tool rejects `.` and `..` path segments, so a call cannot reach a route outside its list. |
 | T8 | Over-parameterization | Tools ask for personal data that the agent fills in from its context | Request only identifiers and domain values. `AT107` flags unused personal fields. |
 | T9 | Sensitive data in the output | The action returns full database records | `agent()` validates the return value against the `output` schema and returns the validated value, so a validator that strips unknown keys removes undeclared fields. |
 | T10 | Quota abuse | An agent in a loop calls an expensive tool | Rate limiting inside the action. actionmcp does not limit calls. |
