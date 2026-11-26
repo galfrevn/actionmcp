@@ -53,7 +53,7 @@ A heuristic can miss a problem and can flag correct code. The checklist is the r
 - `confirmLabels` on `AgentToolsProvider` translates the text of the dialog.
 - A cancel, Escape, or a layout that unmounts returns `{ ok: false, error: { code: 'declined' } }` to the agent. The action does not run.
 - Calls queue behind one dialog. Each call needs its own click.
-- You can replace the dialog with `confirmComponent` on `AgentToolsProvider`, and add your own gate with `onBeforeExecute`.
+- You can replace the dialog with `confirmComponent` on `AgentToolsProvider`, and add your own gate with `onBeforeExecute`. A gate that throws blocks the call.
 
 An agent that controls the pointer could click the dialog like a person would. The dialog protects against calls through the tools API, which is the channel that actionmcp adds.
 

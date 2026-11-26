@@ -34,12 +34,16 @@ export async function executeTool(
       confirmation = accepted ? 'accepted' : 'declined'
       if (!accepted) return fail('declined', DECLINED_MESSAGE)
     }
-    if (runtime.onBeforeExecute && (await runtime.onBeforeExecute(call)) === false) {
+    if (runtime.onBeforeExecute && !(await isAllowed(runtime.onBeforeExecute, call))) {
       return fail('blocked', BLOCKED_MESSAGE)
     }
     if (signal.aborted) return fail('failed', GENERIC_FAILURE_MESSAGE)
     const result = await invoke(tool, input, runtime)
-    runtime.onAfterExecute?.(call, result)
+    try {
+      runtime.onAfterExecute?.(call, result)
+    } catch (error) {
+      console.error('actionmcp: onAfterExecute failed.', error)
+    }
     return result
   }
 
@@ -50,6 +54,15 @@ export async function executeTool(
   } catch (error) {
     publish({ aborted: true })
     throw error
+  }
+}
+
+async function isAllowed(onBeforeExecute: NonNullable<ToolRuntime['onBeforeExecute']>, call: ToolCall): Promise<boolean> {
+  try {
+    return (await onBeforeExecute(call)) !== false
+  } catch (error) {
+    console.error('actionmcp: onBeforeExecute failed, so the tool call is blocked.', error)
+    return false
   }
 }
 

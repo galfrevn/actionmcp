@@ -176,7 +176,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 `src/core/execute.ts` runs these steps for each call:
 
 1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. The default dialog lists each field of the input with its value. The label of a field is the `title` of its property in the input schema, or the field name. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
-2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`.
+2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`, and so does a hook that throws.
 3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
 5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
@@ -245,7 +245,7 @@ Schemas are evaluated on the server, so the validator never reaches the client b
 
 ### Failures are results, not rejections
 
-Browsers replace every rejected `execute` with `OperationError: Tool execution failed.`. The name and the message of the thrown error do not reach the agent. actionmcp therefore resolves with an envelope for every outcome, so an agent can read validation issues and can tell a declined confirmation from a crash. `execute` rejects only when the consumer cancels the call. When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
+Browsers replace every rejected `execute` with `OperationError: Tool execution failed.`. The name and the message of the thrown error do not reach the agent. actionmcp therefore resolves with an envelope for every outcome, so an agent can read validation issues and can tell a declined confirmation from a crash. `execute` rejects only when the consumer cancels the call. An error in `onAfterExecute`, or in a listener of the devtools panel, is logged and does not change the result of an action that already ran. When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
 
 ### Confirmation by default
 

@@ -58,7 +58,7 @@ type AgentResult<Data> =
 | `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. |
 | `failed` | The handler threw, or the output did not match the `output` schema. |
 | `declined` | The user cancelled the confirmation. Added in the browser. |
-| `blocked` | `onBeforeExecute` returned `false`. Added in the browser. |
+| `blocked` | `onBeforeExecute` returned `false` or threw. Added in the browser. |
 
 ### `AgentToolError`
 
@@ -135,8 +135,8 @@ A Client Component that configures the tools registered below it.
 
 | Prop | Type | Meaning |
 |---|---|---|
-| `onBeforeExecute` | `(call) => boolean \| Promise<boolean>` | Runs after the confirmation. `false` blocks the call. |
-| `onAfterExecute` | `(call, result) => void` | Runs after the action, with the result that the agent receives. |
+| `onBeforeExecute` | `(call) => boolean \| Promise<boolean>` | Runs after the confirmation. `false` blocks the call, and so does an error. |
+| `onAfterExecute` | `(call, result) => void` | Runs after the action, with the result that the agent receives. An error is logged and does not change the result. |
 | `confirmComponent` | `ComponentType<ConfirmProps>` | Replaces the default dialog. Call `onConfirm` or `onCancel` exactly once. |
 | `confirmLabels` | `Partial<ConfirmLabels>` | Replaces the text of the default dialog. A label that you leave out keeps its English default. |
 

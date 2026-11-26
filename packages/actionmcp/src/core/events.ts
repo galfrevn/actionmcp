@@ -23,5 +23,11 @@ export function subscribeToToolCalls(listener: ToolCallListener): () => void {
 }
 
 export function publishToolCall(record: ToolCallRecord): void {
-  for (const listener of listeners) listener(record)
+  for (const listener of listeners) {
+    try {
+      listener(record)
+    } catch (error) {
+      console.error('actionmcp: a tool call listener failed.', error)
+    }
+  }
 }
