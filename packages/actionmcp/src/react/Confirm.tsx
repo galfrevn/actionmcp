@@ -32,11 +32,13 @@ const buttonStyle: CSSProperties = { padding: '0.375rem 0.875rem', font: 'inheri
 
 export function ConfirmDialog({ call, title, description, onConfirm, onCancel }: ConfirmProps): ReactNode {
   const dialog = useRef<HTMLDialogElement>(null)
+  const cancelButton = useRef<HTMLButtonElement>(null)
   const id = useId()
 
   useEffect(() => {
     const element = dialog.current
     if (element && !element.open) element.showModal()
+    cancelButton.current?.focus()
     return () => element?.close()
   }, [])
 
@@ -62,7 +64,7 @@ export function ConfirmDialog({ call, title, description, onConfirm, onCancel }:
         {JSON.stringify(call.input, null, 2)}
       </pre>
       <div style={actionsStyle}>
-        <button type="button" autoFocus style={buttonStyle} onClick={onCancel}>
+        <button ref={cancelButton} type="button" style={buttonStyle} onClick={onCancel}>
           Cancel
         </button>
         <button type="button" style={buttonStyle} onClick={onConfirm}>

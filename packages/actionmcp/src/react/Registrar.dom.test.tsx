@@ -278,4 +278,10 @@ describe('ConfirmDialog', () => {
     expect(description?.textContent).toContain('Invite a person.')
     expect(dialog?.dataset.actionmcpConfirm).toBe('team.invite')
   })
+
+  it('focuses Cancel so that Enter never approves by default', async () => {
+    const call = { name: 'team.invite', input: {}, annotations: createTool().annotations, source: 'agent' as const }
+    await render(<ConfirmDialog call={call} description="Invite a person." onConfirm={() => {}} onCancel={() => {}} />)
+    expect(document.activeElement?.textContent).toBe('Cancel')
+  })
 })
