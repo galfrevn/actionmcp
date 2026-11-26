@@ -2,13 +2,13 @@
 
 Project: **actionmcp**. It converts Server Functions and routes in Next.js App Router apps into typed, opt-in, safe-by-default WebMCP tools.
 
-**Status:** planning only. There is no code yet.
+**Status:** v0.1 is implemented in `packages/actionmcp` and is not published to npm. The status of each roadmap stage is at the top of `documentation/roadmap.md`.
 
 ## Start here
 
 1. Read `documentation/spec.md` (what and why) and `documentation/architecture.md` (how).
 2. Read `documentation/security.md` before you touch exposure, confirmation, or execution.
-3. Take the next open task from `documentation/roadmap.md`. The S0 spikes come first. Record spike results in its "Spike results" section.
+3. Take the next open task from `documentation/roadmap.md`. Record spike results in its "Spike results" section.
 4. Check `documentation/decisions.md` before you change anything it covers. Tests and the demo are in `documentation/testing.md`.
 
 ## Conventions
@@ -24,7 +24,8 @@ Project: **actionmcp**. It converts Server Functions and routes in Next.js App R
 - **Architecture:** `src/core/` does not import `next/*` or `react-dom/server` ([ADR-008](documentation/decisions.md#adr-008-framework-agnostic-core-one-package-in-v01)).
 - **Decisions:** if you change a decision, update its record in `documentation/decisions.md` in the same change.
 - **External facts:** the WebMCP, Chrome, and AI SDK specs change every week. Before you rely on a fact in `documentation/research.md`, check its date and its marker (**Verified**, **Secondary source**, or **Unverified**).
-- **Recommended tooling:** pnpm, turbo, vitest, Playwright, oxlint. Write tests with every change. Verify codegen output with snapshots.
+- **Tooling:** pnpm, turbo, tsdown, vitest, Playwright, oxlint. The commands are in the "Development setup" section of `CONTRIBUTING.md`. Write tests with every change. Verify codegen output with snapshots.
+- **Code style:** no comments in source files. Commit messages are lowercase Conventional Commits, one change per commit.
 - **Do not:**
   - expose actions by default;
   - publish to npm or post publicly without the maintainer's approval;

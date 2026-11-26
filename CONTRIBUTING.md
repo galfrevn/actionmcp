@@ -1,26 +1,50 @@
 # Contributing
 
-actionmcp is in the design phase. There is no code, test suite, or release yet, so the most useful contributions change the design or test it against the spikes.
+actionmcp v0.1 is implemented in this repository and is not published to npm yet. Contributions to the code, the tests, and the design are welcome.
 
 ## Ways to help now
 
-- **Discuss the design.** Open an issue or a discussion about any part of the [documentation](README.md#documentation). Name the file and the section.
+- **Report a bug or propose a feature.** Use the issue forms. For a bug, include the output of `npx actionmcp doctor`.
+- **Run an open spike.** SP6 (ChatGPT Desktop) and the origin trial part of SP7 need a person and are open. The checklist for SP6 is in [`e2e/manual/chatgpt.md`](e2e/manual/chatgpt.md). Record each result under [Spike results](documentation/roadmap.md#spike-results) in the format shown there.
+- **Run the benchmark.** The harness is in [`bench/`](bench/README.md). It needs a model key. Follow the publishing rules in that README.
 - **Propose a decision change.** Edit the matching record in [`documentation/decisions.md`](documentation/decisions.md). Until the first release, records are updated in place. Explain the trade-off.
-- **Run or review a spike.** The S0 spikes in the [roadmap](documentation/roadmap.md#s0--verification-spikes-2-days) check the **Unverified** items. Record each result under [Spike results](documentation/roadmap.md#spike-results) in the format shown there.
 
 Open an issue before you start non-trivial work. In the pull request, link the issue and say what changes and why.
 
 ## Development setup
 
-The setup below is available once the code lands. The planned tooling is pnpm, turbo, vitest, Playwright, and oxlint, as listed in [AGENTS.md](AGENTS.md). The planned commands are:
+You need Node.js 22.18 or later and pnpm 11.
 
-- `pnpm test`: unit tests.
-- `pnpm test:integration`: `next build` over the fixtures.
-- `pnpm test:e2e`: Playwright with the polyfill.
-- `pnpm test:e2e:native`: agent-browser with Chrome's native WebMCP. Requires a compatible Chrome.
-- `pnpm bench`: agent evals. Requires `AI_GATEWAY_API_KEY`.
+```bash
+pnpm install
+pnpm build
+pnpm test
+```
+
+The package is in `packages/actionmcp`. The fixture and example apps import its `dist` folder, so run `pnpm build` after you change the package and before you run the commands below.
+
+| Command | What it runs |
+|---|---|
+| `pnpm lint` | oxlint, including the rule that keeps `src/core` free of framework imports |
+| `pnpm typecheck` | TypeScript for the package and the end-to-end specs |
+| `pnpm test` | Unit tests with coverage thresholds |
+| `pnpm test:integration` | `next build` over every fixture, with Turbopack and with webpack |
+| `pnpm build:fixtures && pnpm build:examples` | Production builds that the end-to-end tests serve |
+| `pnpm test:e2e` | Playwright with the polyfill. Run `pnpm exec playwright install chromium` once. |
+| `pnpm test:e2e:native` | Playwright with Chromium's native WebMCP |
+| `pnpm test:package` | The packed tarball in an npm project. Needs the network. |
+| `pnpm bench:smoke` | The benchmark harness without a model |
+| `pnpm bench` | Agent evals. Requires `AI_GATEWAY_API_KEY`. |
 
 The test levels and fixtures are in [testing.md](documentation/testing.md).
+
+### Code conventions
+
+- TypeScript, strict mode, ES modules.
+- No comments in source files. Names, types, and tests carry the intent. A decision that needs an explanation goes in `documentation/decisions.md`.
+- `src/core` does not import `next/*`, `react`, or the other layers ([ADR-008](documentation/decisions.md#adr-008-framework-agnostic-core-one-package-in-v01)).
+- Every change comes with tests. A new diagnostic code needs one positive and one negative test.
+- A change to the generated registry updates the snapshots in `tests/integration/__snapshots__` on purpose: run `pnpm test:integration -u` and review the diff.
 
 ## Security-sensitive changes
 
@@ -32,7 +56,7 @@ Read [AGENTS.md](AGENTS.md) before you use a coding agent. You are responsible f
 
 ## Commit messages
 
-Write commit messages in the imperative mood. Conventional Commits prefixes are preferred: `feat`, `fix`, `docs`, and `chore`. For example: `docs: add security policy`.
+Write commit messages in the imperative mood, in lowercase, with a Conventional Commits prefix: `feat`, `fix`, `docs`, `test`, `ci`, `build`, or `chore`. Keep each commit to one change. For example: `docs: add security policy`.
 
 ## License
 

@@ -2,17 +2,25 @@
 
 WebMCP tools from your Server Actions.
 
-actionmcp will turn the opt-in Server Functions and routes of a Next.js App Router app into typed WebMCP tools that browser agents can discover and call.
+actionmcp turns the Server Functions and routes that you opt in, in a Next.js App Router app, into typed [WebMCP](https://webmachinelearning.github.io/webmcp/) tools. Browser agents discover the tools on `document.modelContext` and call them with the user's session, through the same RPC that your UI uses.
 
-> **Status:** design phase. There is no code and no npm release yet. The design is in [`documentation/`](#documentation).
+> **Status:** v0.1 is implemented and tested in this repository. It is not published to npm yet. WebMCP is a Community Group draft, so expect breaking changes in 0.x releases.
 
-## How it will work
+## Usage
 
-The planned flow has four parts. You mark Server Functions as tools with `agent()`, with a description and a Standard Schema input. A build step scans the project and writes a generated registry of those tools. `<AgentTools />` in a layout registers the tools for that part of the app on `document.modelContext`. An agent call runs through the native Server Function RPC with the user's session, so actionmcp adds no endpoint.
+Wrap the Next.js config. This generates the tool registry during `next build` and `next dev`.
 
-## Planned usage
+```ts
+// next.config.ts
+import { withAgentTools } from 'actionmcp/config'
+import type { NextConfig } from 'next'
 
-The API below is the planned v0.1 API from the [product spec](documentation/spec.md#product-spec). It may change before release.
+const nextConfig: NextConfig = {}
+
+export default withAgentTools()(nextConfig)
+```
+
+Mark a Server Function as a tool, with a description and a Standard Schema input.
 
 ```ts
 // app/todos/actions.ts
@@ -32,6 +40,8 @@ export const addTodo = agent(
 )
 ```
 
+Register the tools in a layout. They exist while that layout is mounted.
+
 ```tsx
 // app/todos/layout.tsx
 import { AgentTools } from 'actionmcp'
@@ -46,7 +56,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-The planned behavior is that the tools from this layout exist only under `/todos/**`.
+The [getting started guide](documentation/getting-started.md) covers each step, the CLI, and the devtools panel.
+
+## What you get
+
+- **Three ways to opt in.** `agent()` for new or edited actions, `defineAgentTools()` for existing `useActionState` and next-safe-action actions without changing them, and an experimental `@agent` JSDoc tag.
+- **Schemas from your validator.** The input schema comes from Zod, Valibot, or ArkType through Standard JSON Schema. `agent()` validates with the same schema on the server.
+- **Scope by layout.** `<AgentTools include={['team.*']} />` in a segment layout registers those tools only under that segment.
+- **A typed `navigate` tool**, generated from `app/`.
+- **Results that an agent can act on.** A failure is a value such as `{ ok: false, error: { code: 'invalid_input', issues } }`, because browsers hide the reason of a rejected tool call.
+- **A CLI.** `actionmcp inspect` lists what is exposed. `actionmcp doctor` reports problems with a fix for each.
+- **A devtools panel** for development, and an [in-app chat example](examples/chat) that uses the same tools through the AI SDK.
+
+## Security defaults
+
+The full threat model is in [security.md](documentation/security.md). The short version is in the [security model](documentation/security-model.md).
+
+- Opt-in only. Nothing becomes a tool without `agent()`, `tool()`, or `@agent`.
+- Consequential by default. A tool is consequential unless it is marked `readOnly`.
+- `confirm: 'consequential'` by default. An in-page dialog asks a human before a consequential tool runs.
+- Native RPC only. Tools execute through the Server Function RPC, with no new endpoints.
+
+Authentication, ownership checks, and rate limiting stay inside your actions. actionmcp does not add them.
 
 ## Where WebMCP runs today
 
@@ -64,38 +95,71 @@ Browser support changes often. Check the [implementation status page](https://gi
 
 Firefox and Safari have standards positions only. This is **Verified** as of 2026-11-26 in the same source.
 
-## Security defaults
+What this repository tests on every commit: Chromium 159 with the polyfill, and Chromium 159 with native WebMCP (`--enable-features=WebMCP`). actionmcp has not been tested in ChatGPT Desktop yet. The [manual checklist](e2e/manual/chatgpt.md) is open.
 
-These v0.1 defaults are planned as non-negotiable. The full threat model is in [security.md](documentation/security.md).
+## How it works
 
-- Opt-in only. Nothing becomes a tool without `agent()`, `tool()`, or `@agent`.
-- Consequential by default. A mutation is consequential unless it is marked `readOnly`.
-- `confirm: 'consequential'` by default. An in-page dialog runs before a consequential tool executes.
-- Native RPC only. Tools execute through the Server Function RPC, with no new endpoints.
+1. A build step scans the project for `agent()` calls, the `agent-tools.ts` registry, and `@agent` tags. It writes `.agent-tools/registry.ts` and `.agent-tools/manifest.json`.
+2. `<AgentTools />`, a Server Component, reads the registry, converts the schemas to JSON Schema on the server, and passes the definitions and the Server Function references to a Client Component.
+3. The Client Component registers the tools on `document.modelContext` and unregisters them when its layout unmounts.
+4. When an agent calls a tool, the page asks for confirmation if the tool is consequential, then calls the Server Function reference. Next.js sends the same POST as for a call from your UI and revalidates the page.
+
+The validator, the registry, and the analyzer stay on the server. The client code for registration and confirmation is about 3 KB gzip, measured by [`bundle-size.test.ts`](packages/actionmcp/src/react/bundle-size.test.ts).
 
 ## Requirements
 
-- Next.js 16.x only for v0.1. Next.js 15.5 is out of scope and will be reconsidered after v0.1 ([ADR-013](documentation/decisions.md#adr-013-supported-nextjs-versions)).
-- No package is published yet, so there is no install step.
+- Next.js 16.x with the App Router ([ADR-013](documentation/decisions.md#adr-013-supported-nextjs-versions)). CI builds the fixtures on 16.4.6 and 16.2.12.
+- React 19.2 or later.
+- Node.js 22.18 or later.
+- A validator with Standard JSON Schema support: Zod 4.2+, ArkType 2.1.28+, or Valibot 1.2+ with `@valibot/to-json-schema`.
+
+## Examples
+
+| Example | Shows |
+|---|---|
+| [`examples/basic`](examples/basic) | A todo app with `agent()` tools |
+| [`examples/formdata`](examples/formdata) | Existing `useActionState` actions with `fromFormDataAction()` |
+| [`examples/safe-action`](examples/safe-action) | A next-safe-action action with `fromSafeAction()` |
+| [`examples/jsdoc`](examples/jsdoc) | The experimental `@agent` tag |
+| [`examples/chat`](examples/chat) | An in-app assistant with the AI SDK WebMCP transport |
+
+```bash
+pnpm install
+pnpm build
+pnpm --filter example-basic dev
+```
 
 ## Documentation
 
-- [Specification](documentation/spec.md): the problem, non-goals, planned scope, public API, and CLI.
+- [Getting started](documentation/getting-started.md)
+- [Security model](documentation/security-model.md)
+- [API reference](documentation/api-reference.md)
+- [FAQ](documentation/faq.md)
+
+Design documents:
+
+- [Specification](documentation/spec.md): the problem, non-goals, scope, public API, and CLI.
 - [Architecture](documentation/architecture.md): modules, build flow, and runtime flow.
 - [Security](documentation/security.md): threat model and non-negotiable defaults.
-- [Testing](documentation/testing.md): test pyramid, fixtures, compatibility matrix, demo, and benchmark method.
-- [Roadmap](documentation/roadmap.md): S0 spikes, tasks S1 to S6, spike results, and risks.
-- [Decisions](documentation/decisions.md): ADR-001 to ADR-014.
+- [Testing](documentation/testing.md): test levels, fixtures, compatibility matrix, demo, and benchmark method.
+- [Roadmap](documentation/roadmap.md): status, tasks, spike results, and risks.
+- [Decisions](documentation/decisions.md): ADR-001 to ADR-017.
 - [Research](documentation/research.md): WebMCP, browser, framework, and schema facts, each with a date and a marker.
+
+## Benchmark
+
+The [benchmark harness](bench/README.md) compares an agent that clicks through the UI with the same agent that calls the WebMCP tools. No results are published yet: a run needs a model key.
 
 ## Contributing
 
-The design is open for review now. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Participation is governed by the [code of conduct](CONTRIBUTING.md#code-of-conduct).
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Security
 
-Report vulnerabilities privately. Do not open a public issue for them. See [Reporting a vulnerability](CONTRIBUTING.md#reporting-a-vulnerability).
+Report vulnerabilities privately. Do not open a public issue for them. See [SECURITY.md](SECURITY.md).
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+actionmcp builds on the [WebMCP draft](https://webmachinelearning.github.io/webmcp/) of the Web Machine Learning Community Group, [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), [Standard Schema](https://standardschema.dev), the [AI SDK](https://github.com/vercel/ai), and [agent-browser](https://github.com/vercel-labs/agent-browser).
