@@ -2,6 +2,23 @@
 
 This project follows [Semantic Versioning](https://semver.org). While the version is 0.x, a minor release can contain breaking changes.
 
+## Unreleased
+
+### Added
+
+- The `AT008` error for a plain function that the registry file lists by reference. Before, `inspect` reported it as a valid tool and the app failed when it rendered.
+- The `AT110` warning for an exported `agent()` or `@agent` tool in a file that the `scan` globs do not cover. Before, the tool was left out with no message.
+- `agent()` logs the issues on the server when the return value of a handler does not match the `output` schema.
+
+### Changed
+
+- The analyzer follows a relative import of the registry file. It reads an `agent()` tool that the registry lists from a file outside the `scan` globs, and it tells apart two tools with the same export name.
+- An `onBeforeExecute` hook that throws blocks the call with the `blocked` code. Before, the call was rejected.
+
+### Fixed
+
+- An error in `onAfterExecute`, or in a listener of the devtools panel, no longer rejects a tool call whose action already ran.
+
 ## 0.2.0
 
 ### Changed
