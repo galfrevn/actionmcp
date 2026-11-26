@@ -6,8 +6,14 @@ import type { AnalyzedTool } from './model'
 import { readToolOptions } from './options'
 import { propertyName, walk, type ParsedModule } from './source'
 
+export interface ToolReference {
+  tool: AnalyzedTool
+  exportName: string
+}
+
 export interface RegistryScan {
   tools: AnalyzedTool[]
+  references: ToolReference[]
   diagnostics: Diagnostic[]
 }
 
@@ -19,7 +25,7 @@ const ADAPTERS: Record<string, ToolAdapter> = {
 }
 
 export function scanRegistryModule(module: ParsedModule): RegistryScan {
-  const scan: RegistryScan = { tools: [], diagnostics: [] }
+  const scan: RegistryScan = { tools: [], references: [], diagnostics: [] }
   const imports = importedNames(module)
   const definition = findCall(module.program, imports, 'defineAgentTools')
   const [tools] = definition?.arguments ?? []
@@ -45,7 +51,7 @@ export function scanRegistryModule(module: ParsedModule): RegistryScan {
 function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, string>, key: string, value: Node): void {
   const line = module.locate(value.start).line
   if (value.type === 'Identifier') {
-    scan.tools.push({
+    const tool: AnalyzedTool = {
       name: key,
       kind: 'explicit',
       source: { file: module.file, export: value.name, line },
@@ -55,7 +61,9 @@ function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, 
       confirm: 'consequential',
       validated: true,
       diagnostics: [],
-    })
+    }
+    scan.tools.push(tool)
+    scan.references.push({ tool, exportName: importedBindings(module).get(value.name) ?? value.name })
     return
   }
   if (!isCallTo(value, imports, 'tool')) {
@@ -104,6 +112,19 @@ function importedNames(module: ParsedModule): Map<string, string> {
     }
   }
   return names
+}
+
+function importedBindings(module: ParsedModule): Map<string, string> {
+  const bindings = new Map<string, string>()
+  for (const statement of module.program.body) {
+    if (statement.type !== 'ImportDeclaration') continue
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
+        bindings.set(specifier.local.name, specifier.imported.name)
+      }
+    }
+  }
+  return bindings
 }
 
 function isCallTo(node: Node, imports: Map<string, string>, name: string): node is CallExpression {

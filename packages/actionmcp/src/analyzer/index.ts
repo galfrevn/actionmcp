@@ -7,7 +7,7 @@ import { NAVIGATE_DESCRIPTION } from '../next/routes'
 import { MAX_TOOLS_PER_ROUTE } from '../server/resolve'
 import type { ResolvedConfig } from './config'
 import { createDiagnostic, sortDiagnostics, type Diagnostic } from './diagnostics'
-import { scanRegistryModule } from './explicit'
+import { scanRegistryModule, type ToolReference } from './explicit'
 import type { AnalysisResult, AnalyzedTool } from './model'
 import { scanRoutes } from './routes'
 import { mayContainTools, scanModule, type ModuleScan } from './scan'
@@ -39,6 +39,7 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
 
   if (config.registry && registryFile) {
     const registry = scanRegistryModule(parseModule(registryFile, readFileSync(config.registry, 'utf8')))
+    for (const reference of registry.references) adoptDiscoveredTool(tools, reference)
     tools.push(...registry.tools)
     diagnostics.push(...registry.diagnostics)
   }
@@ -95,6 +96,15 @@ async function resolveTypes(config: ResolvedConfig, scans: readonly ModuleScan[]
     if (!tool.diagnostics.includes('AT101')) tool.diagnostics.push('AT101')
     diagnostics.push(createDiagnostic('AT101', { file, line: tool.source.line, column: 1 }, inference?.reason, tool.name))
   })
+}
+
+function adoptDiscoveredTool(tools: AnalyzedTool[], { tool, exportName }: ToolReference): void {
+  const matches = tools.filter((candidate) => candidate.kind === 'agent' && candidate.source.export === exportName)
+  const [discovered] = matches
+  if (!discovered || matches.length > 1) return
+  tools.splice(tools.indexOf(discovered), 1)
+  const { name, kind } = tool
+  Object.assign(tool, discovered, { name, kind })
 }
 
 function navigateTool(): AnalyzedTool {

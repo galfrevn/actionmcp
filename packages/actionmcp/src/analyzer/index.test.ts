@@ -127,6 +127,27 @@ export default defineAgentTools({
     })
   })
 
+  it('lists an agent() tool once when the registry renames it', async () => {
+    const { cwd } = setup({
+      'app/todos/actions.ts': ACTIONS,
+      'agent-tools.ts': `import { defineAgentTools } from 'actionmcp/server'
+import { listTodos as list } from './app/todos/actions'
+export default defineAgentTools({ 'todos.list': list })
+`,
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.diagnostics).toEqual([])
+    expect(analysis.tools.map((tool) => [tool.name, tool.kind, tool.source.file])).toEqual([
+      ['addTodo', 'agent', 'app/todos/actions.ts'],
+      ['todos.list', 'explicit', 'app/todos/actions.ts'],
+    ])
+    expect(analysis.tools[1]).toMatchObject({
+      description: 'List the todos of the signed-in user.',
+      annotations: { readOnlyHint: true },
+      validated: true,
+    })
+  })
+
   it('reports AT101 when a JSDoc type cannot become an object schema', async () => {
     const { cwd } = setup({
       'app/actions.ts': `'use server'\n/**\n * Fetch one project by its identifier.\n * @agent readonly\n */\nexport async function getProject(id: string) { await requireUser(); return schema.parse(id) }\n`,

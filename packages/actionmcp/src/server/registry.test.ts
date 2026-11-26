@@ -144,6 +144,12 @@ describe('createRegistry', () => {
     expect(registry.routes).toEqual([{ pattern: '/', params: [] }])
   })
 
+  it('lets an explicit entry replace the discovered entry of the same action', () => {
+    const explicit = defineAgentTools({ 'todos.add': addTodo })
+    const registry = createRegistry({ agent: { addTodo, listTodos }, explicit })
+    expect(registry.entries.map((entry) => entry.name)).toEqual(['todos.list', 'todos.add'])
+  })
+
   it('creates an empty registry', () => {
     expect(createRegistry({})).toMatchObject({ entries: [], routes: [] })
   })

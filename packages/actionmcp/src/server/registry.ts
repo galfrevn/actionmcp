@@ -90,11 +90,13 @@ export function defineAgentTools(tools: Record<string, AgentToolDefinition | Ser
 }
 
 export function createRegistry(sources: RegistrySources): AgentToolRegistry {
-  const entries = [
+  const explicit = sources.explicit?.entries ?? []
+  const explicitActions = new Set(explicit.map((entry) => entry.action))
+  const discovered = [
     ...Object.entries(sources.agent ?? {}).map(([name, action]) => entryFromAgent(name, action)),
     ...Object.entries(sources.jsdoc ?? {}).map(([name, entry]) => entryFromJsdoc(name, entry)),
-    ...(sources.explicit?.entries ?? []),
   ]
+  const entries = [...discovered.filter((entry) => !explicitActions.has(entry.action)), ...explicit]
   return buildRegistry(entries, [...(sources.routes ?? []), ...(sources.explicit?.routes ?? [])])
 }
 
