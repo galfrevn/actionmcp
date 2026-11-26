@@ -11,7 +11,7 @@ async function restoreAccount(page: Page): Promise<void> {
   await expect(page.getByTestId('account')).toHaveText('active')
 }
 
-test.describe('hostile fixture: prompt injection and confirmation (T1, T2, T4)', () => {
+test.describe('hostile fixture: prompt injection and confirmation', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ page }) => {

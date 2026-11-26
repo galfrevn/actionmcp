@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const coreDirectory = fileURLToPath(new URL('.', import.meta.url))
 const ALLOWED_EXTERNALS = ['@standard-schema/spec', '@w3c/webmcp-polyfill', 'webmcp-types']
 
-describe('core isolation (ADR-008)', () => {
+describe('core isolation', () => {
   it('bundles on its own without next, react, or the other layers', async () => {
     const entries = readdirSync(coreDirectory)
       .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))

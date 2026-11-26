@@ -22,7 +22,7 @@
             "patterns": [
               {
                 "group": ["next", "next/*", "react-dom/server", "**/next/*", "**/react/*", "**/server/*"],
-                "message": "src/core must stay framework-agnostic (ADR-008)."
+                "message": "src/core must stay framework-agnostic."
               }
             ]
           }

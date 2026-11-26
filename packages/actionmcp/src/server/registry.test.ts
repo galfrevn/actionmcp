@@ -4,7 +4,7 @@ import { executeTool } from '../core/execute'
 import { INVALID_INPUT_MESSAGE } from '../core/result'
 import { agent } from './agent'
 import { loginSchema, loginUser } from './__fixtures__/safe-action'
-import { invitations, inviteTeamMember, inviteTeamMemberSchema } from './__fixtures__/saas-starter'
+import { invitations, inviteTeamMember, inviteTeamMemberSchema } from './__fixtures__/form-state-action'
 import {
   createRegistry,
   defineAgentTools,
@@ -165,7 +165,7 @@ describe('isAgentToolRegistry', () => {
   })
 })
 
-describe('fromFormDataAction with the saas-starter signature', () => {
+describe('fromFormDataAction with a (previousState, formData) action', () => {
   const registry = defineAgentTools({
     inviteTeamMember: tool(fromFormDataAction(inviteTeamMember), { description: 'Invite a person to the team.', input: inviteTeamMemberSchema }),
   })
