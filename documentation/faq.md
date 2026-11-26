@@ -103,7 +103,7 @@ If the action has not been called yet, it never runs, and an open confirmation c
 
 ## How do I avoid name clashes with other tools on the page?
 
-Use `prefix`: `<AgentTools prefix="acme." />`. actionmcp reserves `snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, and `navigate`. If another library has already registered a name, the tool is registered with a `_2` suffix and a warning is logged in development.
+Use `prefix`: `<AgentTools prefix="acme." />`. actionmcp reserves `snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, and `navigate`. If another library has already registered a name, the tool is registered with a `_2` suffix and a warning is logged in development. Two `<AgentTools />` that register the same tool, such as one in the root layout and one in a segment layout, produce the same suffix, and the warning names both `<AgentTools />`. Use `include` or `exclude` so that one of them registers each tool.
 
 ## How many tools should one page register?
 

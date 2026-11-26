@@ -114,6 +114,19 @@ describe('Registrar', () => {
     logged.mockRestore()
   })
 
+  it('names the cause when two registrars register the same tool', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await render(
+      <>
+        <Registrar tools={[createTool()]} />
+        <Registrar tools={[createTool()]} />
+      </>,
+    )
+    expect((await toolNames()).toSorted()).toEqual(['deleteAccount', 'deleteAccount_2'])
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('two <AgentTools /> on this page register "deleteAccount"'))
+    warned.mockRestore()
+  })
+
   it('keeps the registration when the same definitions render again', async () => {
     const onChange = vi.fn()
     await render(<Registrar tools={[createTool()]} />)

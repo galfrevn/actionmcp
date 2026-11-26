@@ -23,6 +23,18 @@ export interface AgentToolsRegistration {
 
 const noConfirmation = () => undefined
 
+const claimedNames = new Map<string, number>()
+
+function claimNames(names: readonly string[], change: 1 | -1): void {
+  for (const name of names) claimedNames.set(name, (claimedNames.get(name) ?? 0) + change)
+}
+
+function describeCollision(requested: string, registered: string): string {
+  return (claimedNames.get(requested) ?? 0) > 1
+    ? `actionmcp: two <AgentTools /> on this page register "${requested}", so one of them registers it as "${registered}". Use include or exclude so that one <AgentTools /> registers each tool.`
+    : `actionmcp: the tool name "${requested}" is taken, so the tool is registered as "${registered}".`
+}
+
 export function useAgentTools(tools: readonly SerializableToolDef[], registration: AgentToolsRegistration): ReactNode {
   const { polyfill = false, exposedTo, recoverError } = registration
   const hooks = useContext(AgentToolsContext)
@@ -80,15 +92,15 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
         },
       }),
     )
+    const names = definitions.map((definition) => definition.name)
+    if (process.env.NODE_ENV !== 'production') claimNames(names, 1)
     void resolveModelContext(stable.polyfill, signal).then(async (context) => {
       if (!context || signal.aborted) return
       const results = await registerTools(context, definitions, {
         signal,
         exposedTo: stable.exposedTo,
         onCollision: (requested, registered) => {
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn(`actionmcp: the tool name "${requested}" is taken, so the tool is registered as "${registered}".`)
-          }
+          if (process.env.NODE_ENV !== 'production') console.warn(describeCollision(requested, registered))
         },
       })
       if (process.env.NODE_ENV !== 'production' && !signal.aborted) {
@@ -99,7 +111,10 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
         })
       }
     })
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      if (process.env.NODE_ENV !== 'production') claimNames(names, -1)
+    }
   }, [stable, confirm])
 
   useEffect(() => {
