@@ -33,7 +33,7 @@ export const renameProject = agent(
 | Option | Type | Default | Meaning |
 |---|---|---|---|
 | `description` | string literal | required | What the tool does, its side effects, and what it returns. |
-| `input` | Standard Schema | none | Validated on the server before the handler. A tool without `input` ignores what the caller sends. |
+| `input` | Standard Schema | none | Validated on the server before the handler. A tool without `input` ignores what the caller sends. A validator that throws, such as a refinement that queries a database, returns a `failed` result, or the code of an `AgentToolError`. |
 | `output` | Standard Schema | none | Validated on the server after the handler. The validated value is returned, so a schema that strips unknown keys filters the output. |
 | `name` | string literal | the export name | 1 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`, and `.`. |
 | `title` | string | none | Label for browser UIs and the confirmation dialog. |

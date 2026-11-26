@@ -85,6 +85,30 @@ describe('agent', () => {
     expect(handler).toHaveBeenCalledWith(undefined)
   })
 
+  it('returns a failure when the input validator throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubEnv('NODE_ENV', 'production')
+    const handler = vi.fn(async () => 1)
+    const schema = z.object({ id: z.string() }).refine(() => {
+      throw new Error('lookup failed')
+    })
+    const tool = agent({ description: 'Read one project.', input: schema }, handler)
+    await expect(tool({ id: 'p1' })).resolves.toEqual({ ok: false, error: { code: 'failed', message: GENERIC_FAILURE_MESSAGE } })
+    expect(handler).not.toHaveBeenCalled()
+    expect(console.error).toHaveBeenCalledOnce()
+  })
+
+  it('returns the code of an AgentToolError that the input validator throws', async () => {
+    const schema = z.object({ id: z.string() }).refine(() => {
+      throw new AgentToolError('not_found', 'There is no project with that id.')
+    })
+    const tool = agent({ description: 'Read one project.', input: schema }, async () => 1)
+    await expect(tool({ id: 'p1' })).resolves.toEqual({
+      ok: false,
+      error: { code: 'not_found', message: 'There is no project with that id.' },
+    })
+  })
+
   it('returns the code and message of an AgentToolError', async () => {
     const tool = agent({ description: 'Needs auth.' }, async () => {
       throw new AgentToolError('unauthorized', 'Sign in first.')

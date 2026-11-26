@@ -93,13 +93,13 @@ async function runHandler(
   handler: (input: unknown) => Promise<unknown>,
   rawInput: unknown,
 ): Promise<AgentResult<unknown>> {
-  let input: unknown
-  if (options.input) {
-    const validation = await validateWithSchema(options.input, rawInput)
-    if (!validation.ok) return fail('invalid_input', INVALID_INPUT_MESSAGE, validation.issues)
-    input = validation.value
-  }
   try {
+    let input: unknown
+    if (options.input) {
+      const validation = await validateWithSchema(options.input, rawInput)
+      if (!validation.ok) return fail('invalid_input', INVALID_INPUT_MESSAGE, validation.issues)
+      input = validation.value
+    }
     const data = await handler(input)
     if (!options.output) return succeed(data)
     const validation = await validateWithSchema(options.output, data)

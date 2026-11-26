@@ -25,6 +25,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The analyzer reads a `tool(...)` call that the registry file lists through a local `const`. Before, it reported the entry with an empty description and the default `confirm` policy, whatever the call set, and `AT103` did not apply. A local binding that is not such a `const` is an `AT007` error.
 - The devtools panel records the result of an action that ran after the agent cancelled the call, and marks the call "cancelled by the agent". Before, it recorded the call as aborted while the action still ran.
 - `notFound()`, `forbidden()`, and `unauthorized()` in an action return the `not_found`, `forbidden`, and `unauthorized` codes to the agent. An action that the server no longer knows after a deployment returns `stale_page`, and a server error in production returns `The tool failed.` Before, all of them returned `failed` with an internal Next.js message.
+- An `input` validator of `agent()` that throws returns a `failed` result, or the code of an `AgentToolError`, and the error is logged on the server. Before, the error escaped the result and the agent received the Next.js error.
 
 ## 0.2.0
 
