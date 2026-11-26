@@ -65,22 +65,34 @@ export function watchProject(config: ResolvedConfig, options: WatchOptions): Wat
     timer = setTimeout(() => void run(), options.debounceMs ?? 50)
   }
 
-  const watchers: FSWatcher[] = watchRoots(config).map((root) =>
-    watch(root, { recursive: true, persistent }, (_event, file) => schedule(root, file)),
-  )
+  const watchers = new Set<FSWatcher>()
+  const add = (directory: string, recursive: boolean, listener: (file: string | null) => void) => {
+    try {
+      const watcher = watch(directory, { recursive, persistent }, (_event, file) => listener(file))
+      watcher.on('error', (error) => {
+        watcher.close()
+        watchers.delete(watcher)
+        options.onError(error)
+      })
+      watchers.add(watcher)
+    } catch (error) {
+      options.onError(error)
+    }
+  }
+
+  for (const root of watchRoots(config)) add(root, true, (file) => schedule(root, file))
   const { registry } = config
   if (registry) {
     const directory = dirname(registry)
-    watchers.push(
-      watch(directory, { persistent }, (_event, file) => {
-        if (file === basename(registry)) schedule(directory, file)
-      }),
-    )
+    add(directory, false, (file) => {
+      if (file === basename(registry)) schedule(directory, file)
+    })
   }
   return {
     close: () => {
       clearTimeout(timer)
       for (const watcher of watchers) watcher.close()
+      watchers.clear()
     },
   }
 }

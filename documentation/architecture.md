@@ -130,7 +130,7 @@ interface Manifest {
 ## `withAgentTools()`
 
 - During `next build` it runs the generator once. An error-level diagnostic stops the build with the file and the line.
-- During `next dev` it runs the generator once and then watches the scan roots in the same process. Next.js replaces the server process when the config changes, so the watcher does not duplicate.
+- During `next dev` it runs the generator once and then watches the scan roots in the same process. Next.js replaces the server process when the config changes, so the watcher does not duplicate. An error of a watcher, such as `ENOSPC` when Linux runs out of inotify watches, is logged, and that watcher stops. The other watchers and `next dev` keep running.
 - It sets `turbopack.resolveAlias['actionmcp/registry']` and the webpack `resolve.alias` equivalent, so `<AgentTools />` imports the generated registry without props. Without the alias, `actionmcp/registry` resolves to an empty registry that ships with the package.
 - It records its options so that the CLI can read them from `next.config`.
 
