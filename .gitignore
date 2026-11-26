@@ -25,3 +25,5 @@ examples/*/AGENTS.md
 bench/app/AGENTS.md
 
 bench/app/.data/
+
+.vercel/
