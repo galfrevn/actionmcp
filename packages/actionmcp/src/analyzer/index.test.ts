@@ -51,7 +51,7 @@ describe('resolveConfig', () => {
 
   it('finds agent-tools.ts by default and honors explicit values', () => {
     const { cwd } = setup({ 'agent-tools.ts': '', 'tools/registry.ts': '' })
-    expect(resolveConfig({}, cwd).registry).toBe(join(cwd, 'agent-tools.ts'))
+    expect(resolveConfig({}, cwd)).toMatchObject({ registry: join(cwd, 'agent-tools.ts'), registryFromOption: false })
     expect(
       resolveConfig(
         { registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] },
@@ -60,6 +60,7 @@ describe('resolveConfig', () => {
     ).toEqual({
       cwd,
       registry: join(cwd, 'tools/registry.ts'),
+      registryFromOption: true,
       scan: ['features/**'],
       outDir: join(cwd, 'generated'),
       jsdoc: true,

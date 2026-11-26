@@ -40,14 +40,13 @@ describe('watchProject errors', () => {
     project = createProject({ 'app/page.tsx': 'export default function Page() { return null }\n', 'lib/a.ts': '' })
     const errors: unknown[] = []
     const handle = watchProject(resolveConfig({}, project.cwd), { onResult: () => {}, onError: (error) => errors.push(error) })
-    expect(watchers).toHaveLength(2)
+    expect(watchers).toHaveLength(3)
     const limit = Object.assign(new Error('ENOSPC: System limit for number of file watchers reached'), { code: 'ENOSPC' })
     expect(() => watchers[0]?.emit('error', limit)).not.toThrow()
     expect(errors).toEqual([limit])
     expect(watchers[0]?.close).toHaveBeenCalledOnce()
     handle.close()
-    expect(watchers[0]?.close).toHaveBeenCalledOnce()
-    expect(watchers[1]?.close).toHaveBeenCalledOnce()
+    expect(watchers.map((watcher) => watcher.close.mock.calls.length)).toEqual([1, 1, 1])
   })
 
   it('reports a watcher that cannot start and starts the others', () => {
@@ -57,7 +56,7 @@ describe('watchProject errors', () => {
     failures.push(failure)
     const handle = watchProject(resolveConfig({}, project.cwd), { onResult: () => {}, onError: (error) => errors.push(error) })
     expect(errors).toEqual([failure])
-    expect(watchers).toHaveLength(1)
+    expect(watchers).toHaveLength(2)
     handle.close()
   })
 })

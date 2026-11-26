@@ -38,6 +38,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - A registration that fails with `InvalidStateError` is retried with a suffix only when the suffixed name is valid. Before, an invalid name was retried as `name_2` and `name_3`.
 - The `navigate` tool counts a `generateStaticParams` in a layout, such as `app/[lang]/layout.tsx`, for the dynamic segments at or above it. Before, only a `generateStaticParams` in the page counted, so an app under `app/[lang]` had no `navigate` tool by default.
 - An error of a file watcher in `next dev` or `actionmcp generate --watch`, such as `ENOSPC` or `EMFILE`, is reported and stops only that watcher. Before, it crashed the process.
+- In watch mode, a scan root such as `lib/` and a default registry file such as `agent-tools.ts` that are created after the start are watched and analyzed. Before, they needed a restart.
 
 ## 0.2.0
 

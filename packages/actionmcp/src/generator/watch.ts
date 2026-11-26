@@ -1,6 +1,6 @@
 import { existsSync, watch, type FSWatcher } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
-import type { ResolvedConfig } from '../analyzer/config'
+import { findDefaultRegistry, type ResolvedConfig } from '../analyzer/config'
 import { findAppDirectory } from '../analyzer/routes'
 import { createAnalysisCache, generate, type GenerateResult } from './index'
 
@@ -17,6 +17,7 @@ export interface WatchOptions {
 
 const GLOB_CHARACTERS = /[*?{[!]/
 const IGNORED_SEGMENTS = new Set(['node_modules', '.next', '.git'])
+const ROOT_KEY = 'root:'
 
 export function watchRoots(config: ResolvedConfig): string[] {
   const candidates = config.scan.map((pattern) => {
@@ -34,6 +35,7 @@ export function watchProject(config: ResolvedConfig, options: WatchOptions): Wat
   const cache = createAnalysisCache()
   const persistent = options.persistent ?? true
   const outDir = relative(config.cwd, config.outDir)
+  let active = config
   let timer: NodeJS.Timeout | undefined
   let running = false
   let queued = false
@@ -45,7 +47,7 @@ export function watchProject(config: ResolvedConfig, options: WatchOptions): Wat
     }
     running = true
     try {
-      options.onResult(await generate(config, cache))
+      options.onResult(await generate(active, cache))
     } catch (error) {
       options.onError(error)
     } finally {
@@ -65,33 +67,58 @@ export function watchProject(config: ResolvedConfig, options: WatchOptions): Wat
     timer = setTimeout(() => void run(), options.debounceMs ?? 50)
   }
 
-  const watchers = new Set<FSWatcher>()
-  const add = (directory: string, recursive: boolean, listener: (file: string | null) => void) => {
+  const watchers = new Map<string, FSWatcher>()
+  const add = (key: string, directory: string, recursive: boolean, listener: (file: string | null) => void): boolean => {
+    if (watchers.has(key)) return false
     try {
       const watcher = watch(directory, { recursive, persistent }, (_event, file) => listener(file))
       watcher.on('error', (error) => {
         watcher.close()
-        watchers.delete(watcher)
+        watchers.delete(key)
         options.onError(error)
       })
-      watchers.add(watcher)
+      watchers.set(key, watcher)
+      return true
     } catch (error) {
       options.onError(error)
+      return false
     }
   }
 
-  for (const root of watchRoots(config)) add(root, true, (file) => schedule(root, file))
-  const { registry } = config
-  if (registry) {
-    const directory = dirname(registry)
-    add(directory, false, (file) => {
-      if (file === basename(registry)) schedule(directory, file)
-    })
+  const refresh = (): boolean => {
+    for (const [key, watcher] of watchers) {
+      if (key.startsWith(ROOT_KEY) && !existsSync(key.slice(ROOT_KEY.length))) {
+        watcher.close()
+        watchers.delete(key)
+      }
+    }
+    let changed = false
+    for (const root of watchRoots(active)) changed = add(`${ROOT_KEY}${root}`, root, true, (file) => schedule(root, file)) || changed
+    if (!active.registryFromOption) {
+      const registry = findDefaultRegistry(active.cwd)
+      if (registry !== active.registry) {
+        active = { ...active, registry }
+        changed = true
+      }
+    }
+    const { registry } = active
+    if (registry) {
+      const directory = dirname(registry)
+      add(`registry:${registry}`, directory, false, (file) => {
+        if (file === basename(registry)) schedule(directory, file)
+      })
+    }
+    return changed
   }
+
+  refresh()
+  add('project', config.cwd, false, () => {
+    if (refresh()) schedule(config.cwd, null)
+  })
   return {
     close: () => {
       clearTimeout(timer)
-      for (const watcher of watchers) watcher.close()
+      for (const watcher of watchers.values()) watcher.close()
       watchers.clear()
     },
   }
