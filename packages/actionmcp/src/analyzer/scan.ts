@@ -148,14 +148,22 @@ function isAgentCall(context: ModuleContext, node: Node | null | undefined): nod
 }
 
 function scanAgentCalls(context: ModuleContext): void {
+  const registered = new Set<Node>()
   for (const [localName, node] of context.declarations) {
-    if (isAgentCall(context, node)) addAgentTool(context, node, context.exports.get(localName))
+    if (!isAgentCall(context, node)) continue
+    registered.add(node)
+    addAgentTool(context, node, context.exports.get(localName))
   }
   for (const statement of context.module.program.body) {
     if (statement.type === 'ExportDefaultDeclaration' && isAgentCall(context, statement.declaration)) {
+      registered.add(statement.declaration)
       addAgentTool(context, statement.declaration, 'default')
     }
   }
+  walk(context.module.program, (node) => {
+    if (!isAgentCall(context, node) || registered.has(node)) return
+    context.scan.diagnostics.push(createDiagnostic('AT109', context.module.locate(node.start)))
+  })
 }
 
 function addAgentTool(context: ModuleContext, call: CallExpression, exportName: string | undefined): void {

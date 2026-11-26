@@ -181,6 +181,35 @@ describe('agent() detection', () => {
   })
 })
 
+describe('agent() calls that cannot be registered', () => {
+  it('reports AT109 for an agent() call wrapped in another call', () => {
+    const result = scan(`${SERVER}export const a = withLogging(agent({ ${DESCRIPTION} }, ${authedHandler}))\n`)
+    expect(result.tools).toEqual([])
+    expect(result.diagnostics).toMatchObject([{ code: 'AT109', level: 'warn', file: 'app/actions.ts', line: 4, column: 30 }])
+    expect(result.diagnostics[0]).not.toHaveProperty('tool')
+  })
+
+  it('reports AT109 for an agent() call inside a factory function', () => {
+    const code = `import * as tools from 'actionmcp/server'\nexport function authedAgent(options, handler) {\n  return tools.agent(options, async (input) => { await requireUser(); return handler(input) })\n}\n`
+    const result = scan(code, true, 'lib/agent.ts')
+    expect(result.tools).toEqual([])
+    expect(codes(result)).toEqual(['AT109'])
+    expect(result.diagnostics[0]).toMatchObject({ file: 'lib/agent.ts', line: 3 })
+  })
+
+  it('does not report AT109 for a call that is registered or that already has its own diagnostic', () => {
+    const exported = scan(`${SERVER}export const a = agent({ ${DESCRIPTION} }, ${authedHandler})\nexport default agent({ ${DESCRIPTION}, name: 'b' }, ${authedHandler})\n`)
+    expect(codes(exported)).toEqual([])
+    const local = scan(`${SERVER}const a = agent({ ${DESCRIPTION} }, ${authedHandler})\n`)
+    expect(codes(local)).toEqual(['AT004'])
+  })
+
+  it('ignores a function named agent that does not come from actionmcp/server', () => {
+    const result = scan(`'use server'\nimport { agent } from './local'\nexport const a = wrap(agent({ ${DESCRIPTION} }, ${authedHandler}))\n// actionmcp/server\n`)
+    expect(codes(result)).toEqual([])
+  })
+})
+
 describe('@agent detection', () => {
   const header = "'use server'\n"
   const doc = (tagLine: string, description = 'Rename the current project and return the new name.') =>
