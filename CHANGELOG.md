@@ -21,6 +21,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 
 - An error in `onAfterExecute`, or in a listener of the devtools panel, no longer rejects a tool call whose action already ran.
 - A tool whose `confirm` option is not `'always'`, `'consequential'`, or `'never'` asks for confirmation. Before, it ran without one.
+- The analyzer reads a `tool(...)` call that the registry file lists through a local `const`. Before, it reported the entry with an empty description and the default `confirm` policy, whatever the call set, and `AT103` did not apply. A local binding that is not such a `const` is an `AT007` error.
 
 ## 0.2.0
 

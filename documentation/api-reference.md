@@ -86,6 +86,7 @@ export default defineAgentTools({
 - The key is the tool name, unless the options set `name`.
 - `tool()` takes the same options as `agent()`. `input` and `output` describe the tool and are not enforced, because the action runs unchanged.
 - A value can also be an `agent()` tool. It is then registered once, under the key.
+- A value can be a `const` of the same file that holds a `tool(...)` call. The analyzer reads the call through the `const`.
 
 ### Adapters
 
@@ -248,7 +249,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
 | `AT005` | error | The options are not an object literal or contain a spread, `description` is not a string literal, `readOnly`, `consequential`, or `untrustedOutput` is not a boolean literal, or `confirm` is not one of the three policies as a string literal |
 | `AT006` | error | Unknown `@agent` modifier |
-| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
+| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal, or a value is not a `tool(...)` call, an imported `agent()` tool, or a `const` that holds a `tool(...)` call |
 | `AT008` | error | The registry file lists a plain function by reference. Only an `agent()` tool can be listed without `tool(...)`. The check follows relative imports. |
 | `AT101` | warn | A schema cannot be converted to JSON Schema, so the tool is registered without `inputSchema`. For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
 | `AT102` | warn | `@agent` function without detectable runtime validation |
