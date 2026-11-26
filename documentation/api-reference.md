@@ -139,7 +139,7 @@ In development, an invalid, reserved, or duplicate name throws. In production it
 
 Input: `{ route, params?, query? }`. `route` is one of the listed route patterns, such as `/projects/[id]`. `params` fills the dynamic segments, and a catch-all takes a path such as `guides/setup`. The tool calls `router.push()` and returns `{ ok: true, data: { url } }`. It needs no confirmation. A parameter that contains the path segment `.` or `..` returns an `invalid_input` result.
 
-- `navigate` lists routes without dynamic segments and dynamic routes whose page exports `generateStaticParams`.
+- `navigate` lists routes without dynamic segments, and dynamic routes in which every dynamic segment has a `generateStaticParams`. The function can be in the page, or in a layout at the level of the segment or below it, such as `app/[lang]/layout.tsx` for `[lang]`.
 - `navigate={{ routes: ['/projects/*', '/docs/**'] }}` lists the routes whose pattern matches a glob. `*` stays inside one segment and `**` crosses segments.
 
 Route groups, private folders, parallel route slots, intercepted routes, route handlers, and `app/api` are never listed.

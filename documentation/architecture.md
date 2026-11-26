@@ -266,7 +266,7 @@ No agent guarantees its own confirmation for consequential tools, so the page as
 
 ### Default routes of the navigate tool
 
-`navigate` lists the routes without dynamic segments, plus the dynamic routes whose page exports `generateStaticParams`. A dynamic route gives the agent a free-form parameter, so it needs an explicit glob in `navigate.routes`.
+`navigate` lists the routes without dynamic segments, plus the dynamic routes whose dynamic segments all have a `generateStaticParams`. The function counts for a segment when it is in the page, or in a layout at the level of the segment or below it, which follows how Next.js generates params from the bottom up. A dynamic route gives the agent a free-form parameter, so it needs an explicit glob in `navigate.routes`.
 
 ### `agent()` validates its output
 

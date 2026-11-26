@@ -34,6 +34,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - An input schema that is a union of objects, such as `z.discriminatedUnion()`, or an `@agent` parameter whose type is a union of object types, is registered with `type: 'object'` next to its `oneOf` or `anyOf`. Before, it produced `AT101` and the tool had no `inputSchema`.
 - The confirmations of every `<AgentTools />` on a page share one queue, so one dialog is open at a time. Before, each `<AgentTools />` had its own queue, and a root layout and a segment layout could open two dialogs at once.
 - A registration that fails with `InvalidStateError` is retried with a suffix only when the suffixed name is valid. Before, an invalid name was retried as `name_2` and `name_3`.
+- The `navigate` tool counts a `generateStaticParams` in a layout, such as `app/[lang]/layout.tsx`, for the dynamic segments at or above it. Before, only a `generateStaticParams` in the page counted, so an app under `app/[lang]` had no `navigate` tool by default.
 
 ## 0.2.0
 
