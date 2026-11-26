@@ -1,4 +1,4 @@
-import { AgentTools, AgentToolsDevtools } from 'actionmcp'
+import { AgentToolsDevtools } from 'actionmcp'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import './globals.css'
@@ -13,7 +13,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         {children}
-        <AgentTools />
         <AgentToolsDevtools />
       </body>
     </html>
