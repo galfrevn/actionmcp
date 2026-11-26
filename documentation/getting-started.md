@@ -183,7 +183,7 @@ A listed action validates its own input, as it already does for your UI. The `in
 <AgentTools navigate />
 ```
 
-The `navigate` tool lets an agent open a page of the app. By default it lists the routes without dynamic segments and the dynamic routes whose page exports `generateStaticParams`. Pass `navigate={{ routes: ['/projects/*'] }}` to choose the routes yourself.
+The `navigate` tool lets an agent open a page of the app. By default it lists the routes without dynamic segments and the dynamic routes whose dynamic segments all have a `generateStaticParams`, in the page or in a layout at or below the segment, as in `app/[lang]/layout.tsx`. Pass `navigate={{ routes: ['/projects/*'] }}` to choose the routes yourself.
 
 ## Next steps
 

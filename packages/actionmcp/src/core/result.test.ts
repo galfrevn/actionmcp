@@ -130,6 +130,65 @@ describe('normalizeActionResult', () => {
     })
   })
 
+  it('treats empty validationErrors as a success', () => {
+    expect(normalizeActionResult({ data: { id: 7 }, validationErrors: {} }, 'safe-action')).toEqual({ ok: true, data: { id: 7 } })
+    expect(normalizeActionResult({ saved: true, validationErrors: { _errors: [], email: { _errors: [] } } })).toEqual({
+      ok: true,
+      data: { saved: true, validationErrors: { _errors: [], email: { _errors: [] } } },
+    })
+  })
+
+  it('keeps validationErrors without messages as data', () => {
+    expect(normalizeActionResult({ validationErrors: true })).toEqual({ ok: true, data: { validationErrors: true } })
+  })
+
+  it('maps the errors of a form action state to issues, with its message', () => {
+    const raw = { errors: { customerId: ['Please select a customer.'], amount: ['Enter an amount.'] }, message: 'Missing fields.' }
+    for (const adapter of ['formdata', 'form'] as const) {
+      expect(normalizeActionResult(raw, adapter)).toEqual({
+        ok: false,
+        error: {
+          code: 'invalid_input',
+          message: 'Missing fields.',
+          issues: [
+            { message: 'Please select a customer.', path: ['customerId'] },
+            { message: 'Enter an amount.', path: ['amount'] },
+          ],
+        },
+      })
+    }
+    expect(normalizeActionResult({ errors: { formErrors: ['Try again.'], fieldErrors: {} } }, 'form')).toEqual({
+      ok: false,
+      error: { code: 'invalid_input', message: INVALID_INPUT_MESSAGE, issues: [{ message: 'Try again.', path: [] }] },
+    })
+  })
+
+  it('keeps an empty errors field of a form action state and an errors field of other actions as data', () => {
+    expect(normalizeActionResult({ errors: {}, message: 'Saved.' }, 'formdata')).toEqual({
+      ok: true,
+      data: { errors: {}, message: 'Saved.' },
+    })
+    expect(normalizeActionResult({ imported: 3, errors: ['row 4 skipped'] })).toEqual({
+      ok: true,
+      data: { imported: 3, errors: ['row 4 skipped'] },
+    })
+  })
+
+  it('maps an error object with a message to a failure', () => {
+    expect(normalizeActionResult({ error: { message: 'Card declined', code: 'card' } })).toEqual({
+      ok: false,
+      error: { code: 'failed', message: 'Card declined' },
+    })
+    expect(normalizeActionResult({ error: { message: '' } })).toEqual({ ok: true, data: { error: { message: '' } } })
+  })
+
+  it('uses the generic message for an empty serverError', () => {
+    expect(normalizeActionResult({ serverError: '' }, 'safe-action')).toEqual({
+      ok: false,
+      error: { code: 'failed', message: GENERIC_FAILURE_MESSAGE },
+    })
+  })
+
   it('unwraps safe-action data', () => {
     expect(normalizeActionResult({ data: { id: 7 } }, 'safe-action')).toEqual({ ok: true, data: { id: 7 } })
   })

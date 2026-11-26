@@ -82,6 +82,38 @@ describe('scanRoutes', () => {
     ])
   })
 
+  it('counts generateStaticParams in a layout for the dynamic segments at or above it', () => {
+    project = createProject({
+      'app/[lang]/layout.tsx': `export async function generateStaticParams() { return [{ lang: 'en' }] }\nexport const metadata = { title: 'Layout' }\n${PAGE}`,
+      'app/[lang]/page.tsx': PAGE,
+      'app/[lang]/pricing/page.tsx': PAGE,
+      'app/[lang]/(shop)/layout.tsx': PAGE,
+      'app/[lang]/(shop)/products/[id]/page.tsx': PAGE,
+      'app/[lang]/(shop)/products/[id]/reviews/layout.tsx': `export const generateStaticParams = async () => []\n${PAGE}`,
+      'app/[lang]/(shop)/products/[id]/reviews/page.tsx': PAGE,
+      'app/[lang]/docs/[...path]/page.tsx': `export async function generateStaticParams() { return [] }\n${PAGE}`,
+    })
+    expect(scanRoutes(project.cwd)).toEqual([
+      { pattern: '/[lang]', params: ['lang'], staticParams: true },
+      { pattern: '/[lang]/docs/[...path]', params: ['lang', 'path'], catchAll: 'path', staticParams: true },
+      { pattern: '/[lang]/pricing', params: ['lang'], staticParams: true },
+      { pattern: '/[lang]/products/[id]', params: ['lang', 'id'] },
+      { pattern: '/[lang]/products/[id]/reviews', params: ['lang', 'id'], staticParams: true },
+    ])
+  })
+
+  it('applies generateStaticParams in a layout to the pages below it and not to the page above it', () => {
+    project = createProject({
+      'app/[team]/page.tsx': PAGE,
+      'app/[team]/settings/layout.tsx': `export async function generateStaticParams() { return [] }\n${PAGE}`,
+      'app/[team]/settings/page.tsx': PAGE,
+    })
+    expect(scanRoutes(project.cwd)).toEqual([
+      { pattern: '/[team]', params: ['team'] },
+      { pattern: '/[team]/settings', params: ['team'], staticParams: true },
+    ])
+  })
+
   it('reuses the metadata of a page whose modification time and size did not change', () => {
     project = createProject({ 'app/page.tsx': `export const metadata = { title: 'Home' }\n${PAGE}` })
     const file = join(project.cwd, 'app/page.tsx')

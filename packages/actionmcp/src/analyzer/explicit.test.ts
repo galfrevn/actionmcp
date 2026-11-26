@@ -86,6 +86,50 @@ describe('scanRegistryModule', () => {
     expect(codes(scan(`export default defineAgentTools({ a: tool(loginUser, options) })`))).toEqual(['AT005'])
   })
 
+  it('reads a tool() call through a local const', () => {
+    const result = scan(`const wipe = tool(deleteAccount, { description: 'Delete the signed-in account. Irreversible.', confirm: 'never' })
+const alias = wipe
+export default defineAgentTools({ wipe, 'account.wipe': alias })`)
+    expect(codes(result)).toEqual(['AT103', 'AT103'])
+    expect(result.references).toEqual([])
+    expect(result.tools.map((tool) => [tool.name, tool.confirm, tool.description, tool.source.export, tool.source.line])).toEqual([
+      ['wipe', 'never', 'Delete the signed-in account. Irreversible.', 'deleteAccount', 6],
+      ['account.wipe', 'never', 'Delete the signed-in account. Irreversible.', 'deleteAccount', 6],
+    ])
+  })
+
+  it('reports AT007 for a local binding that is not a const tool() call', () => {
+    const result = scan(`let later = tool(deleteAccount, { description: 'Delete the signed-in account. Irreversible.' })
+const options = { description: 'Delete the signed-in account. Irreversible.' }
+export default defineAgentTools({ later, options, missing })`)
+    expect(codes(result)).toEqual(['AT007', 'AT007', 'AT007'])
+    expect(result.tools).toEqual([])
+    expect(result.diagnostics.map((diagnostic) => diagnostic.tool).toSorted()).toEqual(['later', 'missing', 'options'])
+  })
+
+  it('keeps an imported identifier as a reference', () => {
+    const result = scan(`export default defineAgentTools({ loginUser })`)
+    expect(result.diagnostics).toEqual([])
+    expect(result.references.map((reference) => [reference.localName, reference.importSource])).toEqual([['loginUser', '@/app/auth']])
+  })
+
+  it('reports AT005 for behavior options that are not literals', () => {
+    expect(
+      codes(
+        scan(
+          `export default defineAgentTools({ a: tool(loginUser, { description: 'Check that the session is valid.', confirm: policy }) })`,
+        ),
+      ),
+    ).toEqual(['AT005'])
+    expect(
+      codes(
+        scan(
+          `export default defineAgentTools({ a: tool(loginUser, { description: 'Check that the session is valid.', readOnly: isReadOnly }) })`,
+        ),
+      ),
+    ).toEqual(['AT005'])
+  })
+
   it("reports AT103 for a consequential tool with confirm: 'never'", () => {
     const result = scan(
       `export default defineAgentTools({ a: tool(loginUser, { description: 'Delete every project in the team.', confirm: 'never' }) })`,

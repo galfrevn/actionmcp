@@ -53,8 +53,20 @@ export function scanRegistryModule(module: ParsedModule): RegistryScan {
   return scan
 }
 
-function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, string>, key: string, value: Node): void {
+const MAX_ALIAS_DEPTH = 8
+
+function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, string>, key: string, value: Node, depth = 0): void {
   const line = module.locate(value.start).line
+  if (value.type === 'Identifier' && !importedBindings(module).has(value.name)) {
+    const local = localConstant(module, value.name)
+    if (local && depth < MAX_ALIAS_DEPTH) {
+      addTool(module, scan, imports, key, local, depth + 1)
+      return
+    }
+    const detail = `"${value.name}" is neither an imported agent() tool nor a const initialized with tool(...)`
+    scan.diagnostics.push(createDiagnostic('AT007', module.locate(value.start), detail, key))
+    return
+  }
   if (value.type === 'Identifier') {
     const tool: AnalyzedTool = {
       name: key,
@@ -111,6 +123,17 @@ function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, 
   if (tool.confirm === 'never' && annotations.consequentialHint) report('AT103', value.start)
   if (adapter && !reading.input) report('AT205', value.start)
   scan.tools.push(tool)
+}
+
+function localConstant(module: ParsedModule, name: string): Node | undefined {
+  for (const statement of module.program.body) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue
+    for (const declarator of declaration.declarations) {
+      if (declarator.id.type === 'Identifier' && declarator.id.name === name && declarator.init) return declarator.init
+    }
+  }
+  return undefined
 }
 
 function importedNames(module: ParsedModule): Map<string, string> {

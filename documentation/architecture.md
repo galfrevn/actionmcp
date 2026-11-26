@@ -52,14 +52,14 @@ actionmcp/
 
 Input: the `withAgentTools()` options. Output: the list of tools, the route table, and the diagnostics.
 
-1. It walks the `scan` globs and skips `node_modules`, `.next`, and the output folder. It parses, with `oxc-parser`, only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`.
+1. It walks the `scan` globs and skips `node_modules`, `.next`, and the output folder. It parses, with `oxc-parser`, only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`. When a scanned module re-exports `agent` from `actionmcp/server`, as in `export { agent } from 'actionmcp/server'`, it also parses the files with `'use server'`.
 2. In each parsed file it looks for:
-   - exported `agent()` calls, resolving the import from `actionmcp/server` and its aliases;
+   - exported `agent()` calls, resolving the import from `actionmcp/server` and its aliases, or from a scanned module that re-exports `agent` under any name. It resolves the import of such a module when it is relative or matches the `paths` of `tsconfig.json`;
    - exported functions whose JSDoc has the `@agent` tag, when `jsdoc` is enabled.
 3. It reads the registry file (`agent-tools.ts`) statically to list its tools and check their literal options. A registry that it cannot read is an error, so that `inspect` always shows every tool.
 4. It scans `app/` to build the route table for the [navigate tool](#the-navigate-tool).
 
-An `agent()` tool that the registry file lists by reference is registered once, under the registry's name. The analyzer follows a relative import of the registry file to find that tool, including a tool in a file outside the `scan` globs. A reference to a plain function is the error `AT008`.
+An `agent()` tool that the registry file lists by reference is registered once, under the registry's name. The analyzer follows an import of the registry file to find that tool, including a tool in a file outside the `scan` globs. It resolves relative imports and the `paths` of the `tsconfig.json` in the project directory, such as `@/*`. It does not follow `extends`. A reference to a plain function is the error `AT008`.
 
 The analyzer also lists the other source files of the project once per process, and reports `AT110` for an exported tool in a file that no `scan` glob covers. In watch mode it checks the same files again and does not list the project again.
 
@@ -130,7 +130,7 @@ interface Manifest {
 ## `withAgentTools()`
 
 - During `next build` it runs the generator once. An error-level diagnostic stops the build with the file and the line.
-- During `next dev` it runs the generator once and then watches the scan roots in the same process. Next.js replaces the server process when the config changes, so the watcher does not duplicate.
+- During `next dev` it runs the generator once and then watches the scan roots in the same process. Next.js replaces the server process when the config changes, so the watcher does not duplicate. An error of a watcher, such as `ENOSPC` when Linux runs out of inotify watches, is logged, and that watcher stops. The other watchers and `next dev` keep running. The watcher also follows the project directory, so it starts to watch a scan root, such as `lib/`, and a default registry file, such as `agent-tools.ts`, that is created after `next dev` starts.
 - It sets `turbopack.resolveAlias['actionmcp/registry']` and the webpack `resolve.alias` equivalent, so `<AgentTools />` imports the generated registry without props. Without the alias, `actionmcp/registry` resolves to an empty registry that ships with the package.
 - It records its options so that the CLI can read them from `next.config`.
 
@@ -156,6 +156,7 @@ interface SerializableToolDef {
   annotations: { readOnlyHint: boolean; consequentialHint: boolean; untrustedContentHint: boolean }
   confirm: 'always' | 'consequential' | 'never'
   adapter?: 'formdata' | 'form' | 'safe-action'
+  initialState?: unknown
   action: (...args: never[]) => Promise<unknown>
 }
 ```
@@ -166,21 +167,23 @@ The Client Component registers the definitions on `document.modelContext` with o
 
 - The registration is keyed by the serialized definitions. A re-render of the Server Component with the same tools unregisters nothing.
 - The `execute` callback reads the latest Server Function reference from a ref.
-- If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`.
+- If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`. If the import fails, for example after a deployment removes the chunk, it logs the error, and the next `<AgentTools />` that mounts loads it again.
 - If `document.modelContext` is missing and `polyfill` is not set, it checks again 250 ms, 1 s, and 4 s later, for a context that a browser extension installs after the page loads. After the last check it registers nothing.
 - It calls `waitForToolsUntil` when the browser has it.
-- If a name is already taken, the tool is registered with a `_2` suffix and a warning is logged in development.
+- In development, it logs a warning once when the page is not a secure context, because WebMCP and the polyfill exist only in secure contexts.
+- In development, it logs each tool that the browser rejects, with the error. The browser rejects, for example, an `exposedTo` origin that is not a trustworthy URL, or a page whose Permissions Policy does not allow the `tools` feature.
+- If a name is already taken, the tool is registered with a `_2` suffix, then `_3`, and a warning is logged in development. The browser reports a taken name, an invalid name, and an inactive document with the same `InvalidStateError`, so the Registrar retries only while the suffixed name is valid.
 
 ### Executing a tool
 
 `src/core/execute.ts` runs these steps for each call:
 
-1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. The default dialog lists each field of the input with its value. The label of a field is the `title` of its property in the input schema, or the field name. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
+1. **Confirmation.** The page shows the confirmation component unless `confirm` is `'never'`, or it is `'consequential'` and the tool is not consequential. A value that is not one of the three policies asks for confirmation. The default dialog lists each field of the input with its value, in the order of the input schema, and then the fields that the schema does not declare. The label of a declared field is the `title` of its property in the input schema, or the field name. An undeclared field is labeled with its name and "not in the schema". The confirmations of every `<AgentTools />` on the page share one queue, so one dialog is visible at a time. The `<AgentTools />` that registered the tool renders the dialog, with the `AgentToolsProvider` above it. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
 2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`, and so does a hook that throws.
-3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
+3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(initialState, formData)`, where `initialState` comes from `fromFormDataAction()` and is `undefined` by default. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
 5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
-6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. A Server Function in flight cannot be cancelled.
+6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. An action that was already called cannot be cancelled, even while it waits in the Next.js queue. It runs to the end, `onAfterExecute` receives its result, and the devtools panel records the result with "cancelled by the agent". The agent never receives that result, so a retry runs the action a second time.
 
 Next.js dispatches Server Functions one at a time per client, so a tool call queues behind other actions, including the ones the UI starts.
 
@@ -188,7 +191,18 @@ Next.js dispatches Server Functions one at a time per client, so a tool call que
 
 When an action calls `redirect()`, Next.js navigates and the client Promise rejects with an error whose `digest` is `NEXT_REDIRECT;<type>;<url>;<status>;`. The client reads the URL and returns `{ ok: true, data: { navigatedTo: url } }`. The result is delivered even when the navigation unmounts the layout that registered the tool.
 
-`agent()` rethrows every error that carries a `digest`, so `redirect()` and `notFound()` keep their meaning inside a handler.
+`agent()` rethrows every error that carries a `digest`, so `redirect()`, `notFound()`, `forbidden()`, and `unauthorized()` reach Next.js. When a UI calls the action, they keep their meaning. When a tool calls it, the client turns them into results:
+
+| The action calls | The agent receives |
+|---|---|
+| `redirect()` | `{ ok: true, data: { navigatedTo } }` |
+| `notFound()` | `{ ok: false, error: { code: 'not_found' } }` |
+| `forbidden()` | `{ ok: false, error: { code: 'forbidden' } }` |
+| `unauthorized()` | `{ ok: false, error: { code: 'unauthorized' } }` |
+
+The page does not render the `not-found`, `forbidden`, or `unauthorized` file for a tool call.
+
+The client also recognizes two failures of the call itself. An action that the server no longer knows, after a new deployment, becomes `stale_page`. In production, Next.js replaces the message of a server error with a generic text and a `digest`, and the client returns `The tool failed.` instead of that text.
 
 ### The navigate tool
 
@@ -209,7 +223,7 @@ interface RouteEntry {
 }
 ```
 
-The tool's input schema lists the allowed patterns as an enum. The tool builds the URL from `params` and `query`, calls `router.push()`, and returns `{ ok: true, data: { url } }`. It accepts only a route from its enum. It rejects a parameter that contains the path segment `.` or `..`, because the browser would resolve that segment to a route outside the enum.
+The tool's input schema lists the allowed patterns as an enum. The description of `route` names each pattern with the literal `metadata.title` of its page and the names of its parameters, such as `/projects/[id] ("Project"; params: id)`. The tool builds the URL from `params` and `query`, calls `router.push()`, and returns `{ ok: true, data: { url } }`. It accepts only a route from its enum. It rejects a parameter that contains the path segment `.` or `..`, because the browser would resolve that segment to a route outside the enum.
 
 ### Reserved names
 
@@ -253,7 +267,7 @@ No agent guarantees its own confirmation for consequential tools, so the page as
 
 ### Default routes of the navigate tool
 
-`navigate` lists the routes without dynamic segments, plus the dynamic routes whose page exports `generateStaticParams`. A dynamic route gives the agent a free-form parameter, so it needs an explicit glob in `navigate.routes`.
+`navigate` lists the routes without dynamic segments, plus the dynamic routes whose dynamic segments all have a `generateStaticParams`. The function counts for a segment when it is in the page, or in a layout at the level of the segment or below it, which follows how Next.js generates params from the bottom up. A dynamic route gives the agent a free-form parameter, so it needs an explicit glob in `navigate.routes`.
 
 ### `agent()` validates its output
 

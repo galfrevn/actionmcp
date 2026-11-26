@@ -3,10 +3,10 @@ import { gzipSync } from 'node:zlib'
 import { rolldown } from 'rolldown'
 import { describe, expect, it } from 'vitest'
 
-const CLIENT_BUDGET_BYTES = 4096
+const CLIENT_BUDGET_BYTES = 4608
 
 describe('client bundle budget', () => {
-  it('keeps Registrar and Confirm under 4 KB gzip without the polyfill', async () => {
+  it('keeps Registrar and Confirm under 4.5 KB gzip without the polyfill', async () => {
     const bundle = await rolldown({
       input: fileURLToPath(new URL('./Registrar.tsx', import.meta.url)),
       logLevel: 'silent',

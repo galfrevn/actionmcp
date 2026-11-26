@@ -33,6 +33,6 @@ describe.each<Bundler>(['turbopack', 'webpack'])('next build with %s and an AT0x
     expect(build.code).not.toBe(0)
     expect(build.output).toContain('actionmcp found 1 error(s) in the agent tools')
     expect(build.output).toMatch(/AT005 app\/actions\.ts:\d+:\d+ Tool options are not literals: the description is not a string literal/)
-    expect(build.output).toContain('fix: Pass an object literal with a string literal `description`')
+    expect(build.output).toContain('fix: Pass an object literal without spreads, with a string literal `description`')
   })
 })

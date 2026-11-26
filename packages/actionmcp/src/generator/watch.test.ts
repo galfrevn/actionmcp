@@ -112,6 +112,32 @@ describe('watchProject', () => {
     await vi.waitFor(() => expect(results).toHaveLength(1), { timeout: 5000, interval: 25 })
   })
 
+  it('watches a scanned folder that is created after the start', async () => {
+    const { write, results, errors } = await start({ 'app/page.tsx': 'export default function Page() { return null }\n' })
+    write('lib/ping.ts', tool('ping'))
+    await vi.waitFor(() => expect(results.at(-1)?.analysis.tools.map((entry) => entry.name)).toEqual(['ping']), {
+      timeout: 5000,
+      interval: 50,
+    })
+    write('lib/ping.ts', tool('pong'))
+    await vi.waitFor(() => expect(results.at(-1)?.analysis.tools.map((entry) => entry.name)).toEqual(['pong']), {
+      timeout: 5000,
+      interval: 50,
+    })
+    expect(errors).toEqual([])
+  })
+
+  it('reads a registry file that is created after the start', async () => {
+    const { write, results, errors } = await start({
+      'app/page.tsx': 'export default function Page() { return null }\n',
+      'lib/ping.ts': tool('ping'),
+    })
+    write('agent-tools.ts', REGISTRY('Check that the session of the user is valid.'))
+    await vi.waitFor(() => expect(results.at(-1)?.analysis.registry).toBe('agent-tools.ts'), { timeout: 5000, interval: 50 })
+    expect(results.at(-1)?.analysis.tools.find((entry) => entry.name === 'ping')?.kind).toBe('explicit')
+    expect(errors).toEqual([])
+  })
+
   it('stops after close()', async () => {
     const { write, results } = await start({ 'app/actions.ts': tool('ping') })
     handle?.close()

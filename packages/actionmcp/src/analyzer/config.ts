@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 export interface AgentToolsConfig {
+  cwd?: string
   registry?: string
   scan?: string[]
   outDir?: string
@@ -12,6 +13,7 @@ export interface AgentToolsConfig {
 export interface ResolvedConfig {
   cwd: string
   registry: string | undefined
+  registryFromOption: boolean
   scan: string[]
   outDir: string
   jsdoc: boolean
@@ -37,7 +39,8 @@ export const DEFAULT_AUTH_FUNCTIONS = [
 export function resolveConfig(config: AgentToolsConfig = {}, cwd: string = process.cwd()): ResolvedConfig {
   return {
     cwd,
-    registry: resolveRegistry(config.registry, cwd),
+    registry: config.registry ? resolve(cwd, config.registry) : findDefaultRegistry(cwd),
+    registryFromOption: config.registry !== undefined && config.registry !== '',
     scan: config.scan ?? DEFAULT_SCAN,
     outDir: resolve(cwd, config.outDir ?? DEFAULT_OUT_DIR),
     jsdoc: config.jsdoc ?? false,
@@ -45,8 +48,6 @@ export function resolveConfig(config: AgentToolsConfig = {}, cwd: string = proce
   }
 }
 
-function resolveRegistry(registry: string | undefined, cwd: string): string | undefined {
-  if (registry) return resolve(cwd, registry)
-  const found = DEFAULT_REGISTRY_FILES.map((file) => resolve(cwd, file)).find((file) => existsSync(file))
-  return found
+export function findDefaultRegistry(cwd: string): string | undefined {
+  return DEFAULT_REGISTRY_FILES.map((file) => resolve(cwd, file)).find((file) => existsSync(file))
 }

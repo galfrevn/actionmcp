@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { SerializableToolDef } from '../core/types'
-import { recoverRedirect } from '../next/redirect'
+import { recoverServerFunctionError } from '../next/errors'
 import { useAgentTools } from './useAgentTools'
 
 export interface RegistrarProps {
@@ -12,5 +12,5 @@ export interface RegistrarProps {
 }
 
 export function Registrar({ tools, polyfill, exposedTo }: RegistrarProps): ReactNode {
-  return useAgentTools(tools, { polyfill, exposedTo, recoverError: recoverRedirect })
+  return useAgentTools(tools, { polyfill, exposedTo, recoverError: recoverServerFunctionError })
 }

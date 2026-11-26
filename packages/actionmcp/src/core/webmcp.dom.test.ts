@@ -162,11 +162,26 @@ describe('with the polyfill', () => {
     controller.abort()
   })
 
-  it('reports a tool that cannot be registered', async () => {
+  it('reports a tool that cannot be registered without retrying under another invalid name', async () => {
     const controller = new AbortController()
+    const registerTool = vi.spyOn(context, 'registerTool')
     const results = await registerTools(context, [createTool('bad name')], { signal: controller.signal })
     expect(results[0]?.status).toBe('rejected')
+    expect(registerTool).toHaveBeenCalledOnce()
     expect(await toolNames(context)).toEqual([])
+    registerTool.mockRestore()
+  })
+
+  it('does not retry a taken name when the suffix would make it too long', async () => {
+    const controller = new AbortController()
+    const name = 'n'.repeat(127)
+    await registerTools(context, [createTool(name)], { signal: controller.signal })
+    const registerTool = vi.spyOn(context, 'registerTool')
+    const results = await registerTools(context, [createTool(name)], { signal: controller.signal })
+    expect(results[0]?.status).toBe('rejected')
+    expect(registerTool).toHaveBeenCalledOnce()
+    registerTool.mockRestore()
+    controller.abort()
   })
 
   it('passes exposedTo to the registration', async () => {
@@ -184,8 +199,7 @@ describe('with the polyfill', () => {
 
 describe('with a native-like context', () => {
   function createNativeContext(): ModelContext & { waitForToolsUntil: ReturnType<typeof vi.fn> } {
-    const registerTool = Function.prototype.bind.call(async () => undefined, undefined)
-    return { registerTool, waitForToolsUntil: vi.fn() } as never
+    return { registerTool: Math.max, waitForToolsUntil: vi.fn() } as never
   }
 
   it('reports the native status', () => {
@@ -194,6 +208,19 @@ describe('with a native-like context', () => {
     expect(getWebMCPStatus()).toBe('native')
     Reflect.deleteProperty(document, 'modelContext')
     expect(Object.getOwnPropertyDescriptor(Document.prototype, 'modelContext')).toEqual(original)
+  })
+
+  it('does not report a bound or a script function as native', () => {
+    const contexts = [
+      { registerTool: Function.prototype.bind.call(async () => undefined, undefined) },
+      { registerTool: async () => undefined },
+      Object.create({ constructor: function ModelContext() {} }, { registerTool: { value: Math.max } }),
+    ]
+    for (const context of contexts) {
+      Object.defineProperty(document, 'modelContext', { value: context, configurable: true })
+      expect(getWebMCPStatus()).toBe('polyfill')
+      Reflect.deleteProperty(document, 'modelContext')
+    }
   })
 
   it('announces pending registrations with waitForToolsUntil', async () => {

@@ -70,6 +70,11 @@ describe('AgentTools', () => {
     })
   })
 
+  it('rejects an exposedTo origin that the browser would refuse', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(() => AgentTools({ registry, exposedTo: ['agent.example'] })).toThrow('exposedTo needs origins')
+  })
+
   it('lists the routes that the navigate globs allow, and no navigate tool without a match', () => {
     const allowed = rendered(AgentTools({ registry, navigate: { routes: ['/projects/*'] } })).find(
       (element) => element.type === NavigateTool,

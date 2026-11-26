@@ -1,4 +1,5 @@
 import type { WebMCP } from 'webmcp-types'
+import { isValidToolName } from './names'
 
 export type ModelContext = WebMCP.ModelContext & {
   waitForToolsUntil?: (promise: Promise<unknown>) => void
@@ -29,15 +30,29 @@ export function getModelContext(): ModelContext | undefined {
 export function getWebMCPStatus(): WebMCPStatus {
   const context = getModelContext()
   if (!context) return 'unavailable'
-  return Function.prototype.toString.call(context.registerTool).includes('[native code]') ? 'native' : 'polyfill'
+  const prototype: unknown = Object.getPrototypeOf(context)
+  const constructor = typeof prototype === 'object' && prototype !== null ? (prototype as { constructor?: unknown }).constructor : undefined
+  return isNativeFunction(context.registerTool) && isNativeFunction(constructor) ? 'native' : 'polyfill'
+}
+
+function isNativeFunction(value: unknown): boolean {
+  return (
+    typeof value === 'function' && !value.name.startsWith('bound ') && Function.prototype.toString.call(value).includes('[native code]')
+  )
 }
 
 export function loadPolyfill(): Promise<ModelContext | undefined> {
-  pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(({ installWebMCP }) => {
-    installWebMCP()
-    announceAvailability()
-    return getModelContext()
-  })
+  pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(
+    ({ installWebMCP }) => {
+      installWebMCP()
+      announceAvailability()
+      return getModelContext()
+    },
+    (error: unknown) => {
+      pendingPolyfill = undefined
+      throw error
+    },
+  )
   return pendingPolyfill
 }
 
@@ -102,20 +117,25 @@ export function registerTools(
   return registrations
 }
 
+function suffixedName(name: string, attempt: number): string {
+  return attempt === 1 ? name : `${name}_${attempt}`
+}
+
 async function registerTool(
   context: ModelContext,
   tool: ModelContextTool,
   options: RegisterToolsOptions,
   attempt: number,
 ): Promise<string> {
-  const name = attempt === 1 ? tool.name : `${tool.name}_${attempt}`
+  const name = suffixedName(tool.name, attempt)
   const registerOptions: WebMCP.ModelContextRegisterToolOptions = { signal: options.signal }
   if (options.exposedTo) registerOptions.exposedTo = [...options.exposedTo]
   try {
     await context.registerTool({ ...tool, name }, registerOptions)
   } catch (error) {
     const collided = error instanceof DOMException && error.name === 'InvalidStateError'
-    if (!collided || options.signal.aborted || attempt >= MAX_NAME_ATTEMPTS) throw error
+    const canRetry = attempt < MAX_NAME_ATTEMPTS && isValidToolName(suffixedName(tool.name, attempt + 1))
+    if (!collided || options.signal.aborted || !canRetry) throw error
     return registerTool(context, tool, options, attempt + 1)
   }
   if (attempt > 1) options.onCollision?.(tool.name, name)

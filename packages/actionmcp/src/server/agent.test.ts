@@ -29,6 +29,24 @@ describe('agent', () => {
     expect(() => agent({ description }, async () => 1)).toThrow('non-empty description')
   })
 
+  it.each(['Always', 'sometimes', ''])('rejects the confirm policy %j', (confirm) => {
+    expect(() => agent({ description: 'Add a todo.', confirm: confirm as never }, async () => 1)).toThrow(
+      "requires `confirm` to be 'always', 'consequential', or 'never'",
+    )
+  })
+
+  it.each(['readOnly', 'consequential', 'untrustedOutput'])('rejects a %s option that is not a boolean', (key) => {
+    expect(() => agent({ description: 'Add a todo.', [key]: 'false' }, async () => 1)).toThrow(`requires \`${key}\` to be a boolean`)
+  })
+
+  it('accepts every valid policy and boolean', () => {
+    for (const confirm of ['always', 'consequential', 'never'] as const) {
+      expect(() =>
+        agent({ description: 'Add a todo.', confirm, readOnly: false, consequential: true, untrustedOutput: false }, async () => 1),
+      ).not.toThrow()
+    }
+  })
+
   it('passes the validated input to the handler', async () => {
     const handler = vi.fn(async ({ text }: { text: string }) => ({ id: 1, text }))
     const addTodo = agent({ description: 'Add a todo.', input }, handler)
@@ -65,6 +83,30 @@ describe('agent', () => {
     const listTodos = agent({ description: 'List todos.', readOnly: true }, handler)
     await expect((listTodos as (value?: unknown) => Promise<unknown>)({ injected: true })).resolves.toEqual({ ok: true, data: ['a'] })
     expect(handler).toHaveBeenCalledWith(undefined)
+  })
+
+  it('returns a failure when the input validator throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubEnv('NODE_ENV', 'production')
+    const handler = vi.fn(async () => 1)
+    const schema = z.object({ id: z.string() }).refine(() => {
+      throw new Error('lookup failed')
+    })
+    const tool = agent({ description: 'Read one project.', input: schema }, handler)
+    await expect(tool({ id: 'p1' })).resolves.toEqual({ ok: false, error: { code: 'failed', message: GENERIC_FAILURE_MESSAGE } })
+    expect(handler).not.toHaveBeenCalled()
+    expect(console.error).toHaveBeenCalledOnce()
+  })
+
+  it('returns the code of an AgentToolError that the input validator throws', async () => {
+    const schema = z.object({ id: z.string() }).refine(() => {
+      throw new AgentToolError('not_found', 'There is no project with that id.')
+    })
+    const tool = agent({ description: 'Read one project.', input: schema }, async () => 1)
+    await expect(tool({ id: 'p1' })).resolves.toEqual({
+      ok: false,
+      error: { code: 'not_found', message: 'There is no project with that id.' },
+    })
   })
 
   it('returns the code and message of an AgentToolError', async () => {

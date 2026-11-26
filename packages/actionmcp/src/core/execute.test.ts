@@ -35,6 +35,15 @@ describe('requiresConfirmation', () => {
   ])('confirm=%s with %j requires confirmation: %s', (confirm, annotations, expected) => {
     expect(requiresConfirmation({ confirm, annotations })).toBe(expected)
   })
+
+  it.each(['Always', 'sometimes', '', undefined])('asks for confirmation when the policy is the unknown value %j', (confirm) => {
+    expect(requiresConfirmation({ confirm: confirm as never, annotations: readOnly })).toBe(true)
+    expect(requiresConfirmation({ confirm: confirm as never, annotations: consequential })).toBe(true)
+  })
+
+  it('asks for confirmation when the consequential hint is missing', () => {
+    expect(requiresConfirmation({ confirm: 'consequential', annotations: { readOnlyHint: false } as never })).toBe(true)
+  })
 })
 
 describe('executeTool', () => {
@@ -173,6 +182,13 @@ describe('executeTool', () => {
     expect(formData?.get('notify')).toBe('on')
   })
 
+  it('passes the initial state of a FormData action', async () => {
+    const action = vi.fn(async (previous: { count: number }, _formData: FormData) => ({ count: previous.count + 1 }))
+    const tool = createTool({ adapter: 'formdata', confirm: 'never', initialState: { count: 1 }, action })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual({ ok: true, data: { count: 2 } })
+    expect(action.mock.calls[0]?.[0]).toEqual({ count: 1 })
+  })
+
   it('calls a form action with (FormData)', async () => {
     const action = vi.fn(async (formData: FormData) => ({ title: String(formData.get('title')) }))
     const tool = createTool({ adapter: 'form', confirm: 'never', action })
@@ -222,6 +238,33 @@ describe('executeTool', () => {
     expect(tool.action).not.toHaveBeenCalled()
   })
 
+  it('rejects a cancelled call whose action is running and still reports the result of the action', async () => {
+    const records = recordCalls()
+    let finish: (value: unknown) => void = () => {}
+    const tool = createTool({ confirm: 'never', action: vi.fn(() => new Promise((resolve) => (finish = resolve))) })
+    const onAfterExecute = vi.fn()
+    const controller = new AbortController()
+    const execution = executeTool(tool, { id: 1 }, controller.signal, createRuntime({ onAfterExecute }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(tool.action).toHaveBeenCalledOnce()
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(records).toEqual([])
+    finish(succeed({ charged: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onAfterExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'deleteAccount' }), { ok: true, data: { charged: true } })
+    expect(records.map((record) => [record.cancelled, record.result])).toEqual([[true, { ok: true, data: { charged: true } }]])
+  })
+
+  it('marks a call cancelled before its action ran', async () => {
+    const records = recordCalls()
+    const controller = new AbortController()
+    const execution = executeTool(createTool(), {}, controller.signal, createRuntime({ confirm: () => new Promise<boolean>(() => {}) }))
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(records.map((record) => [record.cancelled, record.result])).toEqual([[true, { aborted: true }]])
+  })
+
   it('publishes a record for each call', async () => {
     const records = recordCalls()
     await executeTool(createTool(), { id: 1 }, neverAborted(), createRuntime())
@@ -235,5 +278,6 @@ describe('executeTool', () => {
       ['deleteAccount', 'none', { aborted: true }],
     ])
     expect(records.every((record) => record.durationMs >= 0)).toBe(true)
+    expect(records.map((record) => record.cancelled)).toEqual([false, false, true])
   })
 })

@@ -1,6 +1,7 @@
-import { join, relative, sep } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { resolveConfig, type AgentToolsConfig, type ResolvedConfig } from './analyzer/config'
 import { formatDiagnostic, hasErrors, type Diagnostic } from './analyzer/diagnostics'
+import { findAppDirectory } from './analyzer/routes'
 import { REGISTRY_FILE, generate } from './generator/index'
 import { watchProject } from './generator/watch'
 import { recordConfig } from './next/config-store'
@@ -37,7 +38,7 @@ export function withAgentTools(options: AgentToolsConfig = {}) {
   return <Config extends object = object>(nextConfig?: Config | ConfigFunction<Config>): ConfigFunction<Config> =>
     async (phase, context) => {
       const base = typeof nextConfig === 'function' ? await nextConfig(phase, context) : (nextConfig ?? ({} as Config))
-      const config = resolveConfig(options, process.cwd())
+      const config = resolveConfig(options, resolve(process.cwd(), options.cwd ?? '.'))
       await prepareOnce(phase, config)
       return applyRegistryAlias(base, config)
     }
@@ -65,6 +66,11 @@ function prepareOnce(phase: string, config: ResolvedConfig): Promise<void> {
   const key = `${phase}:${config.cwd}`
   let pending = prepared.get(key)
   if (!pending) {
+    if (!findAppDirectory(config.cwd)) {
+      console.warn(
+        `actionmcp: ${config.cwd} has no app or src/app directory, so no tool or route can be found there. If next runs from another directory, set the cwd option of withAgentTools() to the directory of the Next.js project.`,
+      )
+    }
     pending = phase === BUILD_PHASE ? prepareBuild(config) : prepareDevelopment(config)
     prepared.set(key, pending)
   }

@@ -95,7 +95,9 @@ describe('Registrar', () => {
 
   it('exposes the definition without internal fields', async () => {
     const inputSchema = { type: 'object', properties: { id: { type: 'string' } } }
-    await render(<Registrar tools={[createTool({ title: 'Delete account', inputSchema, adapter: 'formdata' })]} />)
+    await render(
+      <Registrar tools={[createTool({ title: 'Delete account', inputSchema, adapter: 'formdata', initialState: { secret: 1 } })]} />,
+    )
     const [tool] = await context.getTools()
     expect(tool).toMatchObject({
       name: 'deleteAccount',
@@ -104,6 +106,43 @@ describe('Registrar', () => {
       inputSchema,
       annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
     })
+    const registerTool = vi.spyOn(context, 'registerTool')
+    await render(<Registrar tools={[createTool({ name: 'other', adapter: 'formdata', initialState: { secret: 1 } })]} />)
+    expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty('initialState')
+    expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty('adapter')
+    registerTool.mockRestore()
+  })
+
+  it('logs a tool that the browser rejects in development', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await render(<Registrar tools={[createTool({ name: 'bad name' }), createTool()]} />)
+    expect(await toolNames()).toEqual(['deleteAccount'])
+    expect(logged).toHaveBeenCalledWith('actionmcp: the browser rejected the tool "bad name".', expect.any(DOMException))
+    logged.mockRestore()
+  })
+
+  it('names the cause when two registrars register the same tool', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await render(
+      <>
+        <Registrar tools={[createTool()]} />
+        <Registrar tools={[createTool()]} />
+      </>,
+    )
+    expect((await toolNames()).toSorted()).toEqual(['deleteAccount', 'deleteAccount_2'])
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('two <AgentTools /> on this page register "deleteAccount"'))
+    warned.mockRestore()
+  })
+
+  it('warns once in development when the page is not a secure context', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    Object.defineProperty(globalThis, 'isSecureContext', { value: false, configurable: true })
+    await render(<Registrar tools={[createTool()]} />)
+    await render(<Registrar tools={[createTool({ name: 'other' })]} />)
+    Object.defineProperty(globalThis, 'isSecureContext', { value: true, configurable: true })
+    expect(warned).toHaveBeenCalledOnce()
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('WebMCP needs a secure context'))
+    warned.mockRestore()
   })
 
   it('keeps the registration when the same definitions render again', async () => {
@@ -192,6 +231,60 @@ describe('Registrar', () => {
     await expect(second).resolves.toMatchObject({ ok: false })
   })
 
+  it('focuses Cancel again for each queued confirmation', async () => {
+    await render(<Registrar tools={[createTool(), createTool({ name: 'removeMember' })]} />)
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    const allow = button('Allow')
+    allow.focus()
+    await act(async () => allow.click())
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    await act(async () => button('Cancel').click())
+    await expect(second).resolves.toMatchObject({ ok: false })
+  })
+
+  it('shows one confirmation at a time across two registrars', async () => {
+    await render(
+      <>
+        <Registrar tools={[createTool()]} />
+        <AgentToolsProvider confirmLabels={{ allow: 'Permitir' }}>
+          <Registrar tools={[createTool({ name: 'removeMember' })]} />
+        </AgentToolsProvider>
+      </>,
+    )
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    expect(document.querySelectorAll('dialog')).toHaveLength(1)
+    expect(document.querySelector('dialog')?.textContent).toContain('deleteAccount')
+    await act(async () => button('Allow').click())
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(document.querySelectorAll('dialog')).toHaveLength(1)
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    await act(async () => button('Permitir').click())
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(document.querySelector('dialog')).toBeNull()
+  })
+
+  it('shows the next confirmation of another registrar when the first one unmounts', async () => {
+    const Page = ({ withFirst }: { withFirst: boolean }) => (
+      <>
+        {withFirst ? <Registrar tools={[createTool()]} /> : null}
+        <Registrar tools={[createTool({ name: 'removeMember' })]} />
+      </>
+    )
+    await render(<Page withFirst />)
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    await render(<Page withFirst={false} />)
+    await expect(first).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    await act(async () => button('Cancel').click())
+    await expect(second).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+  })
+
   it('runs a read-only tool without a dialog', async () => {
     const tool = createTool({
       name: 'listTodos',
@@ -201,6 +294,14 @@ describe('Registrar', () => {
     await render(<Registrar tools={[tool]} />)
     await expect((await execute('listTodos')).output).resolves.toEqual({ ok: true, data: ['a'] })
     expect(document.querySelector('dialog')).toBeNull()
+  })
+
+  it('reports notFound() in an action as the not_found code', async () => {
+    const action = vi.fn(async () =>
+      Promise.reject(Object.assign(new Error('NEXT_HTTP_ERROR_FALLBACK;404'), { digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })),
+    )
+    await render(<Registrar tools={[createTool({ confirm: 'never', action })]} />)
+    await expect((await execute('deleteAccount')).output).resolves.toMatchObject({ ok: false, error: { code: 'not_found' } })
   })
 
   it('reports a redirect() as a navigation result', async () => {
@@ -318,9 +419,67 @@ describe('ConfirmDialog', () => {
     )
     const names = [...document.querySelectorAll('dialog dt')].map((element) => element.textContent)
     const values = [...document.querySelectorAll('dialog dd')].map((element) => element.textContent)
-    expect(names).toEqual(['Email address', 'role', 'seats', 'tags'])
+    expect(names).toEqual(['Email address', 'role', 'seats (not in the schema)', 'tags (not in the schema)'])
     expect(values).toEqual(['ana@acme.com', 'admin', '3', JSON.stringify(['a', 'b'], null, 2)])
     expect(document.querySelector('[data-actionmcp-confirm-input]')?.getAttribute('aria-label')).toBe('Action input')
+  })
+
+  it('lists the fields in schema order and the undeclared fields after them, whatever order the call uses', async () => {
+    const call = {
+      name: 'payments.send',
+      input: { 'Recipient (verified)': 'alice', note: 'Thanks', amount: 900, recipient: 'mallory' },
+      annotations: createTool().annotations,
+      source: 'agent' as const,
+    }
+    const inputSchema = {
+      type: 'object',
+      properties: {
+        recipient: { type: 'string', title: 'Recipient' },
+        amount: { type: 'number', title: 'Amount' },
+        note: { type: 'string' },
+      },
+    }
+    await render(
+      <ConfirmDialog call={call} description="Send a payment." inputSchema={inputSchema} onConfirm={() => {}} onCancel={() => {}} />,
+    )
+    const names = [...document.querySelectorAll('dialog dt')].map((element) => element.textContent)
+    const values = [...document.querySelectorAll('dialog dd')].map((element) => element.textContent)
+    expect(names).toEqual(['Recipient', 'Amount', 'note', 'Recipient (verified) (not in the schema)'])
+    expect(values).toEqual(['mallory', '900', 'Thanks', 'alice'])
+  })
+
+  it('scrolls a long value inside its own row so that it cannot hide the other fields', async () => {
+    const call = {
+      name: 'notes.add',
+      input: { text: 'x'.repeat(500), lines: 'a\nb\nc\nd\ne', title: 'Short' },
+      annotations: createTool().annotations,
+      source: 'agent' as const,
+    }
+    await render(<ConfirmDialog call={call} description="Add a note." onConfirm={() => {}} onCancel={() => {}} />)
+    const [text, lines, title] = [...document.querySelectorAll<HTMLElement>('dialog dd')]
+    expect(text?.tabIndex).toBe(0)
+    expect(text?.style.maxHeight).toBe('6rem')
+    expect(text?.style.overflow).toBe('auto')
+    expect(lines?.tabIndex).toBe(0)
+    expect(title?.hasAttribute('tabindex')).toBe(false)
+    expect(title?.style.maxHeight).toBe('')
+    expect(document.querySelector<HTMLElement>('[data-actionmcp-confirm-input]')?.style.maxHeight).toBe('')
+  })
+
+  it('translates the label of an undeclared field', async () => {
+    const call = { name: 'a', input: { extra: 1 }, annotations: createTool().annotations, source: 'agent' as const }
+    const inputSchema = { type: 'object', properties: {} }
+    await render(
+      <ConfirmDialog
+        call={call}
+        description="Run it."
+        inputSchema={inputSchema}
+        labels={{ extra: 'fuera del schema' }}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+    expect(document.querySelector('dialog dt')?.textContent).toBe('extra (fuera del schema)')
   })
 
   it('renders an input value as text and never as markup', async () => {

@@ -1,11 +1,19 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { executeTool, type ToolRuntime } from '../core/execute'
 import type { AgentResult } from '../core/result'
-import type { SerializableToolDef, ToolCall } from '../core/types'
+import type { SerializableToolDef } from '../core/types'
 import { registerTools, resolveModelContext, type ModelContextTool } from '../core/webmcp'
 import { ConfirmDialog } from './Confirm'
+import {
+  currentConfirmation,
+  dequeueConfirmation,
+  enqueueConfirmation,
+  nextConfirmationId,
+  subscribeToConfirmations,
+  type PendingConfirmation,
+} from './confirmations'
 import { AgentToolsContext } from './context'
 
 export interface AgentToolsRegistration {
@@ -14,35 +22,55 @@ export interface AgentToolsRegistration {
   recoverError?: ((error: unknown) => AgentResult<unknown> | undefined) | undefined
 }
 
-interface PendingConfirmation {
-  call: ToolCall
-  tool: SerializableToolDef
-  settle: (accepted: boolean) => void
+const noConfirmation = () => undefined
+
+const claimedNames = new Map<string, number>()
+let warnedInsecureContext = false
+
+function warnInsecureContext(): void {
+  if (warnedInsecureContext || globalThis.isSecureContext !== false) return
+  warnedInsecureContext = true
+  console.warn(
+    `actionmcp: WebMCP needs a secure context, and ${location.origin} is not one, so no tool is registered. Open the app over HTTPS or on http://localhost.`,
+  )
+}
+
+function claimNames(names: readonly string[], change: 1 | -1): void {
+  for (const name of names) claimedNames.set(name, (claimedNames.get(name) ?? 0) + change)
+}
+
+function describeCollision(requested: string, registered: string): string {
+  return (claimedNames.get(requested) ?? 0) > 1
+    ? `actionmcp: two <AgentTools /> on this page register "${requested}", so one of them registers it as "${registered}". Use include or exclude so that one <AgentTools /> registers each tool.`
+    : `actionmcp: the tool name "${requested}" is taken, so the tool is registered as "${registered}".`
 }
 
 export function useAgentTools(tools: readonly SerializableToolDef[], registration: AgentToolsRegistration): ReactNode {
   const { polyfill = false, exposedTo, recoverError } = registration
   const hooks = useContext(AgentToolsContext)
-  const [pending, setPending] = useState<readonly PendingConfirmation[]>([])
+  const [owner] = useState(() => ({}))
+  const current = useSyncExternalStore(subscribeToConfirmations, currentConfirmation, noConfirmation)
   const unsettled = useRef(new Set<PendingConfirmation>())
 
   const confirm = useCallback<ToolRuntime['confirm']>(
     (call, tool, signal) =>
       new Promise<boolean>((resolve) => {
         const confirmation: PendingConfirmation = {
+          id: nextConfirmationId(),
+          owner,
           call,
           tool,
           settle: (accepted) => {
-            unsettled.current.delete(confirmation)
-            setPending((queue) => queue.filter((entry) => entry !== confirmation))
+            if (!unsettled.current.delete(confirmation)) return
+            dequeueConfirmation(confirmation)
             resolve(accepted)
           },
         }
         unsettled.current.add(confirmation)
         signal.addEventListener('abort', () => confirmation.settle(false), { once: true })
-        setPending((queue) => [...queue, confirmation])
+        enqueueConfirmation(confirmation)
       }),
-    [],
+    [owner],
   )
 
   const latest = useRef({ tools, hooks, recoverError })
@@ -60,34 +88,49 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
     const controller = new AbortController()
     const { signal } = controller
     const definitions = stable.tools.map(
-      ({ action: _action, confirm: _confirm, adapter: _adapter, ...definition }, index): ModelContextTool => ({
+      ({ action: _action, confirm: _confirm, adapter: _adapter, initialState: _initialState, ...definition }, index): ModelContextTool => ({
         ...definition,
         execute: (input, options) => {
-          const current = latest.current
-          const tool = current.tools[index]
+          const state = latest.current
+          const tool = state.tools[index]
           if (!tool) throw new DOMException('The tool is no longer registered.', 'InvalidStateError')
           return executeTool(tool, input, options.signal, {
             confirm,
-            onBeforeExecute: current.hooks.onBeforeExecute,
-            onAfterExecute: current.hooks.onAfterExecute,
-            recoverError: current.recoverError,
+            onBeforeExecute: state.hooks.onBeforeExecute,
+            onAfterExecute: state.hooks.onAfterExecute,
+            recoverError: state.recoverError,
           })
         },
       }),
     )
-    void resolveModelContext(stable.polyfill, signal).then((context) => {
-      if (!context || signal.aborted) return
-      return registerTools(context, definitions, {
-        signal,
-        exposedTo: stable.exposedTo,
-        onCollision: (requested, registered) => {
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn(`actionmcp: the tool name "${requested}" is taken, so the tool is registered as "${registered}".`)
-          }
-        },
+    const names = definitions.map((definition) => definition.name)
+    if (process.env.NODE_ENV !== 'production') {
+      claimNames(names, 1)
+      warnInsecureContext()
+    }
+    resolveModelContext(stable.polyfill, signal)
+      .then(async (context) => {
+        if (!context || signal.aborted) return
+        const results = await registerTools(context, definitions, {
+          signal,
+          exposedTo: stable.exposedTo,
+          onCollision: (requested, registered) => {
+            if (process.env.NODE_ENV !== 'production') console.warn(describeCollision(requested, registered))
+          },
+        })
+        if (process.env.NODE_ENV !== 'production' && !signal.aborted) {
+          results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+              console.error(`actionmcp: the browser rejected the tool "${definitions[index]?.name}".`, result.reason)
+            }
+          })
+        }
       })
-    })
-    return () => controller.abort()
+      .catch((error: unknown) => console.error('actionmcp: the tools could not be registered.', error))
+    return () => {
+      controller.abort()
+      if (process.env.NODE_ENV !== 'production') claimNames(names, -1)
+    }
   }, [stable, confirm])
 
   useEffect(() => {
@@ -97,11 +140,11 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
     }
   }, [])
 
-  const current = pending[0]
-  if (!current) return null
+  if (current?.owner !== owner) return null
   const Confirm = hooks.confirmComponent ?? ConfirmDialog
   return (
     <Confirm
+      key={current.id}
       call={current.call}
       title={current.tool.title}
       description={current.tool.description}

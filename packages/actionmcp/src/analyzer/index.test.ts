@@ -51,7 +51,7 @@ describe('resolveConfig', () => {
 
   it('finds agent-tools.ts by default and honors explicit values', () => {
     const { cwd } = setup({ 'agent-tools.ts': '', 'tools/registry.ts': '' })
-    expect(resolveConfig({}, cwd).registry).toBe(join(cwd, 'agent-tools.ts'))
+    expect(resolveConfig({}, cwd)).toMatchObject({ registry: join(cwd, 'agent-tools.ts'), registryFromOption: false })
     expect(
       resolveConfig(
         { registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] },
@@ -60,6 +60,7 @@ describe('resolveConfig', () => {
     ).toEqual({
       cwd,
       registry: join(cwd, 'tools/registry.ts'),
+      registryFromOption: true,
       scan: ['features/**'],
       outDir: join(cwd, 'generated'),
       jsdoc: true,
@@ -196,6 +197,30 @@ export default defineAgentTools({ 'todos.list': list })
     expect(analysis.diagnostics[0]?.message).toContain('33 tools')
   })
 
+  it('counts AT104 per <AgentTools /> from its literal include and exclude', async () => {
+    const tools = (prefix: string, count: number) =>
+      `'use server'\nimport { agent } from 'actionmcp/server'\n${Array.from({ length: count }, (_value, index) => `export const ${prefix}${index} = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })`).join('\n')}\n`
+    const layout = (props: string) =>
+      `import { AgentTools } from 'actionmcp'\nexport default function Layout() { return <AgentTools ${props} /> }\n`
+    const { cwd, write } = setup({
+      'app/alpha/actions.ts': tools('alpha', 20),
+      'app/beta/actions.ts': tools('beta', 20),
+      'app/alpha/layout.tsx': layout(`include={['alpha*']}`),
+      'app/beta/layout.tsx': layout(`include={['beta*']} exclude={['beta1']}`),
+    })
+    expect((await analyze(resolveConfig({}, cwd))).diagnostics).toEqual([])
+
+    write('app/layout.tsx', layout(''))
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.file, diagnostic.line])).toEqual([
+      ['AT104', 'app/layout.tsx', 2],
+    ])
+    expect(analysis.diagnostics[0]?.message).toContain('registers 40 tools')
+
+    write('app/layout.tsx', layout('include={scope}'))
+    expect((await analyze(resolveConfig({}, cwd))).diagnostics).toEqual([])
+  })
+
   it('lists the navigate tool when a layout enables it', async () => {
     const { cwd } = setup({
       'app/layout.tsx':
@@ -238,6 +263,50 @@ export default defineAgentTools({ 'todos.list': list })
   })
 })
 
+describe('agent() re-exported from a project module', () => {
+  const action = (source: string, call = 'agent') =>
+    `'use server'\nimport { ${call} } from '${source}'\nexport const addNote = ${call}({ description: 'Add a note for the signed-in user.' }, async () => { await requireUser() })\n`
+
+  it.each([
+    ['a relative import of a named re-export', `export { agent } from 'actionmcp/server'\n`, action('../../lib/agent')],
+    ['a path alias of a named re-export', `export { agent } from 'actionmcp/server'\n`, action('@/lib/agent')],
+    ['a re-export of every export', `export * from 'actionmcp/server'\n`, action('@/lib/agent')],
+    ['a renamed re-export', `export { agent as defineTool } from 'actionmcp/server'\n`, action('@/lib/agent', 'defineTool')],
+    ['an imported binding that the module exports', `import { agent } from 'actionmcp/server'\nexport { agent }\n`, action('@/lib/agent')],
+    [
+      'a namespace import',
+      `export { agent } from 'actionmcp/server'\n`,
+      `'use server'\nimport * as tools from '@/lib/agent'\nexport const addNote = tools.agent({ description: 'Add a note for the signed-in user.' }, async () => { await requireUser() })\n`,
+    ],
+  ])('registers a tool through %s', async (_label, reexport, code) => {
+    const { cwd } = setup({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, moduleResolution: 'bundler', paths: { '@/*': ['./*'] } } }),
+      'lib/agent.ts': reexport,
+      'app/notes/actions.ts': code,
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.diagnostics).toEqual([])
+    expect(analysis.tools.map((tool) => [tool.name, tool.source.file])).toEqual([['addNote', 'app/notes/actions.ts']])
+  })
+
+  it('does not treat another export of the module as agent()', async () => {
+    const { cwd } = setup({
+      'lib/agent.ts': `export { agent } from 'actionmcp/server'\nexport function wrap<T>(value: T) { return value }\n`,
+      'app/notes/actions.ts': action('../../lib/agent', 'wrap'),
+    })
+    expect((await analyze(resolveConfig({}, cwd))).tools).toEqual([])
+  })
+
+  it('analyzes again when a module starts to re-export agent()', async () => {
+    const { cwd, write } = setup({ 'lib/agent.ts': `export const agent = () => null\n`, 'app/notes/actions.ts': action('../../lib/agent') })
+    const config = resolveConfig({}, cwd)
+    const cache = createAnalysisCache()
+    expect((await analyze(config, cache)).tools).toEqual([])
+    write('lib/agent.ts', `export { agent } from 'actionmcp/server'\n`)
+    expect((await analyze(config, cache)).tools.map((tool) => tool.name)).toEqual(['addNote'])
+  })
+})
+
 describe('registry references', () => {
   const registry = (imports: string, entries: string) =>
     `import { defineAgentTools } from 'actionmcp/server'\n${imports}\nexport default defineAgentTools(${entries})\n`
@@ -275,6 +344,17 @@ describe('registry references', () => {
     const analysis = await analyze(resolveConfig({}, cwd))
     expect(codes(analysis)).toEqual([])
     expect(analysis.tools.map((tool) => tool.name)).toEqual(['made', 'plain'])
+  })
+
+  it('resolves a registry import through the paths of tsconfig.json', async () => {
+    const { cwd } = setup({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, moduleResolution: 'bundler', paths: { '@/*': ['./*'] } } }),
+      'app/actions.ts': `'use server'\nexport async function plain() { return 1 }\n`,
+      'agent-tools.ts': registry(`import { plain } from '@/app/actions'`, '{ plain }'),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(codes(analysis)).toEqual(['AT008'])
+    expect(analysis.diagnostics[0]?.message).toContain('"plain" is a plain function in app/actions.ts')
   })
 
   it('adopts the tool from the imported file when two files export the same name', async () => {

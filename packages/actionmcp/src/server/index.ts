@@ -9,6 +9,7 @@ export {
   type AdaptedAction,
   type AgentToolDefinition,
   type AgentToolRegistry,
+  type FormDataActionOptions,
   type JsdocToolEntry,
   type RegistrySources,
 } from './registry'

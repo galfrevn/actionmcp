@@ -31,14 +31,53 @@ export function convertSchema(schema: StandardSchemaV1, direction: SchemaDirecti
     return { ok: false, reason: 'The validator does not implement Standard JSON Schema.' }
   }
   try {
-    const converted = sanitizeJsonSchema(jsonSchema[direction]({ target: JSON_SCHEMA_TARGET }))
-    if (direction === 'input' && converted.type !== 'object') {
-      return { ok: false, reason: 'A tool input schema must describe an object.' }
-    }
-    return { ok: true, schema: converted }
+    const libraryOptions = schema['~standard'].vendor === 'zod' ? zodOptions(direction) : undefined
+    const converted = sanitizeJsonSchema(
+      jsonSchema[direction]({ target: JSON_SCHEMA_TARGET, ...(libraryOptions ? { libraryOptions } : {}) }),
+    )
+    if (direction === 'output') return { ok: true, schema: converted }
+    const object = asObjectSchema(converted)
+    return object ? { ok: true, schema: object } : { ok: false, reason: 'A tool input schema must describe an object.' }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }
+}
+
+interface ZodOverrideContext {
+  zodSchema: { _zod: { def: { type: string; coerce?: boolean } } }
+  jsonSchema: JsonSchema
+}
+
+const ZOD_UNREPRESENTABLE_TYPES = new Set(['bigint', 'symbol', 'undefined', 'void', 'nan', 'custom', 'function', 'transform', 'map', 'set'])
+
+function zodOptions(direction: SchemaDirection): Record<string, unknown> {
+  return {
+    unrepresentable: 'any',
+    override: ({ zodSchema, jsonSchema }: ZodOverrideContext) => {
+      const { _zod: internals } = zodSchema
+      const { type, coerce } = internals.def
+      if (type === 'date') {
+        if (direction === 'input' && !coerce) {
+          throw new Error('A z.date() field cannot come from an agent, because a tool input is JSON. Use z.coerce.date().')
+        }
+        jsonSchema.type = 'string'
+        jsonSchema.format = 'date-time'
+      } else if (ZOD_UNREPRESENTABLE_TYPES.has(type) && Object.keys(jsonSchema).length === 0) {
+        throw new Error(`The Zod type "${type}" cannot be represented in JSON Schema.`)
+      }
+    },
+  }
+}
+
+export function asObjectSchema(schema: JsonSchema): JsonSchema | undefined {
+  if (schema.type === 'object') return schema
+  const branches = schema.oneOf ?? schema.anyOf
+  const isObjectUnion =
+    schema.type === undefined &&
+    Array.isArray(branches) &&
+    branches.length > 0 &&
+    branches.every((branch) => isRecord(branch) && branch.type === 'object')
+  return isObjectUnion ? { type: 'object', ...schema } : undefined
 }
 
 export function sanitizeJsonSchema(schema: JsonSchema): JsonSchema {

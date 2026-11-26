@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type ts from 'typescript'
 import { isRecord } from '../core/guards'
-import { sanitizeJsonSchema } from '../core/schema'
+import { asObjectSchema, sanitizeJsonSchema } from '../core/schema'
 import type { JsonSchema } from '../core/types'
 import { SCHEMA_GENERATOR_PACKAGE, loadTypeToolchain, toolchainOrigins, type TypeToolchain } from './toolchain'
 
@@ -64,11 +64,8 @@ export function normalizeTypeSchema(schema: Record<string, unknown>): TypeInfere
   const renamed = renameDefinitionReferences(
     isRecord(definitions) && Object.keys(definitions).length > 0 ? { ...rest, $defs: definitions } : rest,
   )
-  const sanitized = sanitizeJsonSchema(renamed as JsonSchema)
-  if (sanitized.type !== 'object') {
-    return { ok: false, reason: 'the first parameter is not an object type' }
-  }
-  return { ok: true, schema: sanitized }
+  const object = asObjectSchema(sanitizeJsonSchema(renamed as JsonSchema))
+  return object ? { ok: true, schema: object } : { ok: false, reason: 'the first parameter is not an object type' }
 }
 
 function renameDefinitionReferences(node: unknown): unknown {

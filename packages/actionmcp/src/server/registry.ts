@@ -1,7 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { isNonEmptyString } from '../core/guards'
 import type { ConfirmPolicy, JsonSchema, RouteEntry, ServerFunction, ToolAdapter, ToolAnnotations } from '../core/types'
-import { readAgentMeta, type AgentToolOptions } from './agent'
+import { assertToolOptions, readAgentMeta, type AgentToolOptions } from './agent'
 
 const REGISTRY: unique symbol = Symbol.for('actionmcp.registry') as never
 
@@ -10,12 +9,18 @@ export type ToolKind = 'agent' | 'jsdoc' | 'explicit'
 export interface AdaptedAction {
   readonly action: ServerFunction
   readonly adapter: ToolAdapter
+  readonly initialState?: unknown
+}
+
+export interface FormDataActionOptions {
+  initialState?: unknown
 }
 
 export interface AgentToolDefinition {
   readonly action: ServerFunction
   readonly options: AgentToolOptions
   readonly adapter?: ToolAdapter
+  readonly initialState?: unknown
 }
 
 export interface JsdocToolEntry {
@@ -39,6 +44,7 @@ export interface RegistryEntry {
   readonly annotations: ToolAnnotations
   readonly confirm: ConfirmPolicy
   readonly adapter?: ToolAdapter
+  readonly initialState?: unknown
 }
 
 export interface AgentToolRegistry {
@@ -54,8 +60,13 @@ export interface RegistrySources {
   routes?: RouteEntry[]
 }
 
-export function fromFormDataAction(action: (previousState: never, formData: FormData) => Promise<unknown>): AdaptedAction {
-  return { action, adapter: 'formdata' }
+export function fromFormDataAction(
+  action: (previousState: never, formData: FormData) => Promise<unknown>,
+  options: FormDataActionOptions = {},
+): AdaptedAction {
+  return options.initialState === undefined
+    ? { action, adapter: 'formdata' }
+    : { action, adapter: 'formdata', initialState: options.initialState }
 }
 
 export function fromFormAction(action: (formData: FormData) => Promise<unknown>): AdaptedAction {
@@ -67,10 +78,10 @@ export function fromSafeAction(action: (input: never) => Promise<unknown>): Adap
 }
 
 export function tool(action: ServerFunction | AdaptedAction, options: AgentToolOptions): AgentToolDefinition {
-  if (!isNonEmptyString(options.description)) {
-    throw new TypeError('tool() requires a non-empty description.')
-  }
-  return typeof action === 'function' ? { action, options } : { action: action.action, options, adapter: action.adapter }
+  assertToolOptions(options, 'tool()')
+  if (typeof action === 'function') return { action, options }
+  const { action: adapted, adapter, initialState } = action
+  return initialState === undefined ? { action: adapted, options, adapter } : { action: adapted, options, adapter, initialState }
 }
 
 export function defineAgentTools(tools: Record<string, AgentToolDefinition | ServerFunction>): AgentToolRegistry {
@@ -108,7 +119,7 @@ function entryFromAgent(name: string, action: ServerFunction): RegistryEntry {
 }
 
 function entryFromOptions(key: string, kind: ToolKind, definition: AgentToolDefinition): RegistryEntry {
-  const { action, options, adapter } = definition
+  const { action, options, adapter, initialState } = definition
   return {
     name: options.name ?? key,
     kind,
@@ -120,6 +131,7 @@ function entryFromOptions(key: string, kind: ToolKind, definition: AgentToolDefi
     ...(options.input ? { input: options.input } : {}),
     ...(options.output ? { output: options.output } : {}),
     ...(adapter ? { adapter } : {}),
+    ...(initialState === undefined ? {} : { initialState }),
   }
 }
 

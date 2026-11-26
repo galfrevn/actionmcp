@@ -33,7 +33,7 @@ export const renameProject = agent(
 | Option | Type | Default | Meaning |
 |---|---|---|---|
 | `description` | string literal | required | What the tool does, its side effects, and what it returns. |
-| `input` | Standard Schema | none | Validated on the server before the handler. A tool without `input` ignores what the caller sends. |
+| `input` | Standard Schema | none | Validated on the server before the handler. A tool without `input` ignores what the caller sends. A validator that throws, such as a refinement that queries a database, returns a `failed` result, or the code of an `AgentToolError`. |
 | `output` | Standard Schema | none | Validated on the server after the handler. The validated value is returned, so a schema that strips unknown keys filters the output. |
 | `name` | string literal | the export name | 1 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`, and `.`. |
 | `title` | string | none | Label for browser UIs and the confirmation dialog. |
@@ -41,6 +41,8 @@ export const renameProject = agent(
 | `consequential` | boolean | `!readOnly` | Sets `consequentialHint`. |
 | `untrustedOutput` | boolean | `false` | Sets `untrustedContentHint`. |
 | `confirm` | `'always'`, `'consequential'`, `'never'` | `'consequential'` | When the page asks a human before the tool runs. |
+
+`agent()` throws a `TypeError` when `description` is empty, when `confirm` is not one of the three policies, or when `readOnly`, `consequential`, or `untrustedOutput` is not a boolean. `tool()` applies the same checks.
 
 The returned function has the signature `(input) => Promise<AgentResult<Data>>`, or `() => Promise<AgentResult<Data>>` for a tool without `input`.
 
@@ -55,8 +57,11 @@ type AgentResult<Data> =
 | Code | Source |
 |---|---|
 | `invalid_input` | The input did not match the schema. `issues` lists each problem. |
-| `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. |
-| `failed` | The handler threw, or the output did not match the `output` schema. |
+| `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. Also the result of `unauthorized()` from `next/navigation` in an action. Added in the browser in that case. |
+| `forbidden` | The action called `forbidden()`. Added in the browser. |
+| `not_found` | The action called `notFound()`. Added in the browser. |
+| `stale_page` | The server no longer knows the action, because the app was deployed again after the page loaded. Added in the browser. |
+| `failed` | The handler threw, or the output did not match the `output` schema. In production, a server error that reaches the browser has the generic message `The tool failed.` |
 | `declined` | The user cancelled the confirmation. Added in the browser. |
 | `blocked` | `onBeforeExecute` returned `false` or threw. Added in the browser. |
 
@@ -84,18 +89,30 @@ export default defineAgentTools({
 - The key is the tool name, unless the options set `name`.
 - `tool()` takes the same options as `agent()`. `input` and `output` describe the tool and are not enforced, because the action runs unchanged.
 - A value can also be an `agent()` tool. It is then registered once, under the key.
+- A value can be a `const` of the same file that holds a `tool(...)` call. The analyzer reads the call through the `const`.
 
 ### Adapters
 
 | Function | Wraps | The browser calls |
 |---|---|---|
-| `fromFormDataAction(action)` | `(previousState, formData) => Promise<State>` | `action(undefined, formData)` |
+| `fromFormDataAction(action, { initialState })` | `(previousState, formData) => Promise<State>` | `action(initialState, formData)`. `initialState` is `undefined` when you leave it out |
 | `fromFormAction(action)` | `(formData) => Promise<unknown>` | `action(formData)` |
 | `fromSafeAction(action)` | a next-safe-action action | `action(input)`, then unwraps `data`, `serverError`, and `validationErrors` |
 
+Pass `initialState` when the action reads its previous state, as in `fromFormDataAction(createInvoice, { initialState: { message: null, errors: {} } })`. It must be a value that React can pass to a Client Component, because the browser calls the action.
+
 The `FormData` is built from the agent's input object: an array becomes repeated keys, `true` becomes `'on'`, `false`, `null`, and `undefined` are omitted, and a nested object becomes a JSON string.
 
-A result of the form `{ error: 'message' }` becomes a `failed` result. Any other value becomes `{ ok: true, data }`.
+The result of an adapted or listed action becomes a failure in these cases. Any other value becomes `{ ok: true, data }`.
+
+| The action returns | The agent receives |
+|---|---|
+| `{ serverError }` | `failed`, with `serverError` as the message when it is a non-empty string |
+| `{ validationErrors }` with at least one message | `invalid_input`, with an issue for each message |
+| `{ errors }` with at least one message, from `fromFormDataAction()` or `fromFormAction()` | `invalid_input`, with an issue for each message and `message` as the message when it is a string |
+| `{ error: 'message' }` or `{ error: { message } }` | `failed`, with that message |
+
+An empty `validationErrors` or `errors`, such as `{}`, is not a failure.
 
 ### `createRegistry(sources)`
 
@@ -114,17 +131,17 @@ A Server Component that registers tools while it is mounted.
 | `prefix` | `string` | none | Prepended to every name, including `navigate`. |
 | `navigate` | `boolean` or `{ routes?: string[] }` | `false` | Registers the navigation tool. See below. |
 | `polyfill` | `boolean` | `false` | Loads `@w3c/webmcp-polyfill` when `document.modelContext` is missing. |
-| `exposedTo` | `string[]` | none | Origins passed to `registerTool`, for tools in cross-origin frames. |
+| `exposedTo` | `string[]` | none | Origins passed to `registerTool`, for tools in cross-origin frames. Each origin needs `https:`, or `http:` on `localhost` or a loopback address, as in `https://agent.example`. |
 | `originTrialToken` | `string` | `NEXT_PUBLIC_WEBMCP_OT_TOKEN` | Renders `<meta http-equiv="origin-trial">`. |
 | `registry` | `AgentToolRegistry` | the generated registry | For setups without `withAgentTools()`. |
 
-In development, an invalid, reserved, or duplicate name throws. In production it logs a warning and the tool is skipped.
+In development, an invalid, reserved, or duplicate name throws. In production it logs a warning and the tool is skipped. An `exposedTo` origin that the browser would refuse, such as `agent.example` without a scheme, follows the same rule: it throws in development, and in production it is left out with a warning.
 
 ### The `navigate` tool
 
 Input: `{ route, params?, query? }`. `route` is one of the listed route patterns, such as `/projects/[id]`. `params` fills the dynamic segments, and a catch-all takes a path such as `guides/setup`. The tool calls `router.push()` and returns `{ ok: true, data: { url } }`. It needs no confirmation. A parameter that contains the path segment `.` or `..` returns an `invalid_input` result.
 
-- `navigate` lists routes without dynamic segments and dynamic routes whose page exports `generateStaticParams`.
+- `navigate` lists routes without dynamic segments, and dynamic routes in which every dynamic segment has a `generateStaticParams`. The function can be in the page, or in a layout at the level of the segment or below it, such as `app/[lang]/layout.tsx` for `[lang]`.
 - `navigate={{ routes: ['/projects/*', '/docs/**'] }}` lists the routes whose pattern matches a glob. `*` stays inside one segment and `**` crosses segments.
 
 Route groups, private folders, parallel route slots, intercepted routes, route handlers, and `app/api` are never listed.
@@ -144,13 +161,13 @@ A Client Component that configures the tools registered below it.
 
 ### `<AgentToolsDevtools />`
 
-A floating panel that renders only when `NODE_ENV` is `development`. It shows whether WebMCP is native, from the polyfill, or unavailable, lists every tool on the page, runs a tool with JSON input, and keeps a history of calls to actionmcp tools.
+A floating panel that renders only when `NODE_ENV` is `development`. It shows whether WebMCP is native, from the polyfill, or unavailable. It reports "native" only when `registerTool` and the constructor of `document.modelContext` are browser functions, so a context that a script or an extension builds, even around a bound native function, shows as the polyfill. It lists every tool on the page, runs a tool with JSON input, and keeps a history of calls to actionmcp tools.
 
 ### `ConfirmDialog`
 
 The default confirmation component, exported so that a custom one can wrap it.
 
-The dialog shows the title, the tool description, and one row for each field of the input. The label of a row is the `title` of that property in the input schema, or the field name. With Zod, set it with `z.string().meta({ title: 'Email address' })`.
+The dialog shows the title, the tool description, and one row for each field of the input. The rows of the fields that the input schema declares come first, in the order of the schema. The label of such a row is the `title` of that property in the input schema, or the field name. With Zod, set it with `z.string().meta({ title: 'Email address' })`. A field that the input schema does not declare comes after them, labeled with its name and the `extra` label. A value longer than 160 characters or 4 lines scrolls inside its own row.
 
 `ConfirmLabels` holds the text of the dialog:
 
@@ -159,6 +176,7 @@ The dialog shows the title, the tool description, and one row for each field of 
 | `title` | `Allow “{tool}”?`. `{tool}` is replaced with the tool title, or with the tool name. |
 | `intro` | `An agent wants to run this action.` |
 | `input` | `Action input`, the accessible name of the input list. |
+| `extra` | `not in the schema`, shown after the name of a field that the input schema does not declare. |
 | `allow` | `Allow` |
 | `cancel` | `Cancel` |
 
@@ -176,13 +194,14 @@ The labels are plain strings, so a Server Component can pass translated text.
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
+| `cwd` | `string` | the directory where `next` runs | The directory of the Next.js project. A relative path is resolved from the directory where `next` runs. Set it when you run `next build apps/web` from another directory, because Next.js does not pass the project directory to `next.config`. The CLI ignores it and uses `--cwd`. |
 | `registry` | `string` | `./agent-tools.ts` if it exists | The explicit registry file. |
 | `scan` | `string[]` | `['app/**', 'lib/**', 'src/**']` | Globs to scan for `agent()` and `@agent`. A tool in a file outside these globs is not registered and produces `AT110`. |
 | `outDir` | `string` | `.agent-tools` | Where the registry and the manifest are written. |
 | `jsdoc` | `boolean` | `false` | Enables the experimental `@agent` path. |
 | `auth` | `string[]` | common names such as `auth` and `requireUser` | Function names that count as an auth check for `AT105`. |
 
-`nextConfig` can be an object or a function. During `next build`, an `AT0xx` error stops the build with the file and the line.
+`nextConfig` can be an object or a function. During `next build` and `next dev`, `withAgentTools()` warns when the project directory has no `app` or `src/app` directory. During `next build`, an `AT0xx` error stops the build with the file and the line.
 
 ## The `@agent` tag (experimental)
 
@@ -243,15 +262,15 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT001` | error | Invalid tool name, or a name that is not a string literal |
 | `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, `navigate`) |
 | `AT003` | error | Empty description |
-| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
-| `AT005` | error | `description` is not a string literal, or the options are not an object literal |
+| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'`. Also a tool in a `.mts` file, because Next.js does not apply `'use server'` to `.mts` files |
+| `AT005` | error | The options are not an object literal or contain a spread, `description` is not a string literal, `readOnly`, `consequential`, or `untrustedOutput` is not a boolean literal, or `confirm` is not one of the three policies as a string literal |
 | `AT006` | error | Unknown `@agent` modifier |
-| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
+| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal, or a value is not a `tool(...)` call, an imported `agent()` tool, or a `const` that holds a `tool(...)` call |
 | `AT008` | error | The registry file lists a plain function by reference. Only an `agent()` tool can be listed without `tool(...)`. The check follows relative imports. |
 | `AT101` | warn | A schema cannot be converted to JSON Schema, so the tool is registered without `inputSchema`. For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
 | `AT102` | warn | `@agent` function without detectable runtime validation |
 | `AT103` | warn | Consequential tool with `confirm: 'never'` |
-| `AT104` | warn | More than 32 tools |
+| `AT104` | warn | An `<AgentTools />` registers more than 32 tools, counted from its literal `include` and `exclude`. When the scanned files contain no `<AgentTools />`, the project defines more than 32 tools |
 | `AT105` | warn | `agent()` or `@agent` handler without a call to a configured auth function |
 | `AT106` | warn | `output` schema with free-form strings and no `untrustedOutput` |
 | `AT107` | warn | Input schema with a personal field (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |

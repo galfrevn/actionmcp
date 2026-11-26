@@ -4,7 +4,7 @@ import { NAVIGATE_TOOL_NAME, applyPrefix } from '../core/names'
 import { NavigateTool } from '../next/NavigateTool'
 import { selectRoutes, type NavigateOptions } from '../next/routes'
 import type { AgentToolRegistry } from '../server/registry'
-import { MAX_TOOLS_PER_ROUTE, selectTools } from '../server/resolve'
+import { MAX_TOOLS_PER_ROUTE, selectOrigins, selectTools } from '../server/resolve'
 import { Registrar } from './Registrar'
 
 export interface AgentToolsProps {
@@ -24,11 +24,12 @@ export function AgentTools({
   exclude,
   prefix,
   navigate = false,
-  exposedTo,
+  exposedTo: requestedOrigins,
   polyfill = false,
   originTrialToken = process.env.NEXT_PUBLIC_WEBMCP_OT_TOKEN,
 }: AgentToolsProps): ReactNode {
   const tools = selectTools(registry, { include, exclude, prefix })
+  const exposedTo = selectOrigins(requestedOrigins)
   const routes = navigate ? selectRoutes(registry.routes, navigate) : []
   if (process.env.NODE_ENV !== 'production' && tools.length > MAX_TOOLS_PER_ROUTE) {
     console.warn(

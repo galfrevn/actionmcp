@@ -4,11 +4,20 @@ import { createDiagnostic, type Diagnostic, type DiagnosticCode } from './diagno
 import { formDataAdapter, parseAgentTag, type AgentTag } from './jsdoc'
 import type { AnalyzedTool } from './model'
 import { readToolOptions } from './options'
-import { collectCalleeNames, collectObjectKeys, collectReferencedNames, hasUseServerDirective, walk, type ParsedModule } from './source'
+import {
+  collectCalleeNames,
+  collectObjectKeys,
+  collectReferencedNames,
+  hasUseServerDirective,
+  staticString,
+  walk,
+  type ParsedModule,
+} from './source'
 
 export interface ScanOptions {
   jsdoc: boolean
   auth: readonly string[]
+  resolveAgentNames?: ((source: string, fromFile: string) => ReadonlySet<string> | undefined) | undefined
 }
 
 export interface TypeRequest {
@@ -17,12 +26,22 @@ export interface TypeRequest {
   parameterOffset: number
 }
 
+export interface AgentToolsElement {
+  file: string
+  line: number
+  column: number
+  readable: boolean
+  include?: string[]
+  exclude?: string[]
+}
+
 export interface ModuleScan {
   tools: AnalyzedTool[]
   typeRequests: TypeRequest[]
   diagnostics: Diagnostic[]
   usesNavigate: boolean
   plainFunctions: string[]
+  agentToolsElements: AgentToolsElement[]
 }
 
 type AnyFunction = FunctionNode | ArrowFunctionExpression
@@ -32,7 +51,7 @@ interface ModuleContext {
   options: ScanOptions
   useServer: boolean
   agentNames: Set<string>
-  namespaces: Set<string>
+  namespaces: Map<string, ReadonlySet<string>>
   componentNames: Set<string>
   declarations: Map<string, Node>
   exports: Map<string, string>
@@ -40,11 +59,47 @@ interface ModuleContext {
 }
 
 const SERVER_ENTRY = 'actionmcp/server'
+const SERVER_AGENT_EXPORTS: ReadonlySet<string> = new Set(['agent'])
+const AGENT_REEXPORT = /export\s*\*\s*from\s*['"]actionmcp\/server['"]|export\s*\{[^}]*\bagent\b/
 const COMPONENT_ENTRIES = ['actionmcp', 'actionmcp/client']
 const MIN_DESCRIPTION_LENGTH = 20
+const UNSUPPORTED_SERVER_FILE = /\.mts$/
 const VALIDATION_CALL = /^(?:parse|safeParse|parseAsync|safeParseAsync|validate|assert\w*)$/
 const FREE_FORM_STRING = /\bstring\s*\(|['"`]string\b/
 const PERSONAL_FIELDS = new Set(['email', 'phone', 'address', 'birthdate', 'birthday', 'dob', 'ssn', 'passport'])
+
+function serverFileProblem(context: ModuleContext): string {
+  return UNSUPPORTED_SERVER_FILE.test(context.module.file)
+    ? "Next.js does not turn a .mts file with 'use server' into Server Functions; rename the file to .ts"
+    : "the file has no 'use server' directive"
+}
+
+export function mayReexportAgent(code: string): boolean {
+  return code.includes(SERVER_ENTRY) && AGENT_REEXPORT.test(code)
+}
+
+export function readAgentReexports(module: ParsedModule): string[] {
+  const locals = new Set<string>()
+  const exported = new Set<string>()
+  for (const statement of module.program.body) {
+    if (statement.type === 'ImportDeclaration' && statement.source.value === SERVER_ENTRY) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ImportSpecifier' && importedName(specifier.imported) === 'agent') locals.add(specifier.local.name)
+      }
+    } else if (statement.type === 'ExportAllDeclaration' && statement.source.value === SERVER_ENTRY && !statement.exported) {
+      exported.add('agent')
+    } else if (statement.type === 'ExportNamedDeclaration' && !statement.declaration) {
+      const fromServer = statement.source?.value === SERVER_ENTRY
+      for (const specifier of statement.specifiers) {
+        const local = importedName(specifier.local)
+        const name = importedName(specifier.exported)
+        if (local === undefined || name === undefined) continue
+        if ((fromServer && local === 'agent') || (!statement.source && locals.has(local))) exported.add(name)
+      }
+    }
+  }
+  return [...exported].toSorted()
+}
 
 export function mayContainTools(code: string): boolean {
   return code.includes(SERVER_ENTRY) || code.includes('@agent') || code.includes('AgentTools')
@@ -54,18 +109,19 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
   const context: ModuleContext = {
     module,
     options,
-    useServer: hasUseServerDirective(module.program),
+    useServer: hasUseServerDirective(module.program) && !UNSUPPORTED_SERVER_FILE.test(module.file),
     agentNames: new Set(),
-    namespaces: new Set(),
+    namespaces: new Map(),
     componentNames: new Set(),
     declarations: new Map(),
     exports: new Map(),
-    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [] },
+    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [], agentToolsElements: [] },
   }
   indexModule(context)
   scanAgentCalls(context)
   if (options.jsdoc) scanAgentTags(context)
   context.scan.usesNavigate = usesNavigate(context)
+  context.scan.agentToolsElements = agentToolsElements(context)
   context.scan.plainFunctions = plainFunctionExports(context)
   return context.scan
 }
@@ -105,10 +161,11 @@ function indexModule(context: ModuleContext): void {
 
 function indexImport(context: ModuleContext, statement: Extract<Statement, { type: 'ImportDeclaration' }>): void {
   const source = statement.source.value
+  const agentExports = source === SERVER_ENTRY ? SERVER_AGENT_EXPORTS : context.options.resolveAgentNames?.(source, context.module.file)
   for (const specifier of statement.specifiers) {
-    if (source === SERVER_ENTRY) {
-      if (specifier.type === 'ImportNamespaceSpecifier') context.namespaces.add(specifier.local.name)
-      else if (specifier.type === 'ImportSpecifier' && importedName(specifier.imported) === 'agent') {
+    if (agentExports) {
+      if (specifier.type === 'ImportNamespaceSpecifier') context.namespaces.set(specifier.local.name, agentExports)
+      else if (specifier.type === 'ImportSpecifier' && agentExports.has(importedName(specifier.imported) ?? '')) {
         context.agentNames.add(specifier.local.name)
       }
     } else if (COMPONENT_ENTRIES.includes(source)) {
@@ -147,9 +204,8 @@ function isAgentCall(context: ModuleContext, node: Node | null | undefined): nod
   return (
     callee.type === 'MemberExpression' &&
     callee.object.type === 'Identifier' &&
-    context.namespaces.has(callee.object.name) &&
     callee.property.type === 'Identifier' &&
-    callee.property.name === 'agent'
+    context.namespaces.get(callee.object.name)?.has(callee.property.name) === true
   )
 }
 
@@ -191,7 +247,7 @@ function addAgentTool(context: ModuleContext, call: CallExpression, exportName: 
   const report = reporter(context, tool)
 
   if (exportName === undefined) report('AT004', call.start, 'the agent() call is not exported')
-  if (!context.useServer) report('AT004', call.start, "the file has no 'use server' directive")
+  if (!context.useServer) report('AT004', call.start, serverFileProblem(context))
   if (exportName === 'default' && reading.name === undefined) report('AT001', call.start, 'a default export needs the `name` option')
   for (const issue of reading.issues) report(issue.code, issue.offset, issue.detail)
   checkDescription(tool, report, call.start)
@@ -239,7 +295,7 @@ function addJsdocTool(context: ModuleContext, comment: Comment, tag: AgentTag): 
 
   if (!target) report('AT004', offset, '@agent is not attached to a function')
   else if (exportName === undefined) report('AT004', offset, 'the function is not exported')
-  if (!context.useServer) report('AT004', offset, "the file has no 'use server' directive")
+  if (!context.useServer) report('AT004', offset, serverFileProblem(context))
   for (const modifier of tag.unknownModifiers) report('AT006', comment.start, `"${modifier}"`)
   if (tag.description === '') report('AT003', comment.start, 'the JSDoc comment has no description')
   checkDescription(tool, report, comment.start)
@@ -360,6 +416,36 @@ function checkPersonalFields(keys: Set<string>, handler: AnyFunction, report: Re
 function isPersonalField(key: string): boolean {
   const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_-]+/)
   return words.some((word) => PERSONAL_FIELDS.has(word.toLowerCase()))
+}
+
+function agentToolsElements(context: ModuleContext): AgentToolsElement[] {
+  if (context.componentNames.size === 0) return []
+  const elements: AgentToolsElement[] = []
+  walk(context.module.program, (node) => {
+    if (node.type !== 'JSXOpeningElement') return
+    if (node.name.type !== 'JSXIdentifier' || !context.componentNames.has(node.name.name)) return
+    const element: AgentToolsElement = { ...context.module.locate(node.start), readable: true }
+    for (const attribute of node.attributes) {
+      if (attribute.type !== 'JSXAttribute' || attribute.name.type !== 'JSXIdentifier') {
+        element.readable = false
+        continue
+      }
+      const { name } = attribute.name
+      if (name === 'registry') element.readable = false
+      if (name !== 'include' && name !== 'exclude') continue
+      const patterns = literalStrings(attribute.value)
+      if (patterns === undefined) element.readable = false
+      else element[name] = patterns
+    }
+    elements.push(element)
+  })
+  return elements
+}
+
+function literalStrings(value: Node | null | undefined): string[] | undefined {
+  if (value?.type !== 'JSXExpressionContainer' || value.expression.type !== 'ArrayExpression') return undefined
+  const strings = value.expression.elements.map((element) => staticString(element as Node | null))
+  return strings.every((text) => text !== undefined) ? (strings as string[]) : undefined
 }
 
 function usesNavigate(context: ModuleContext): boolean {

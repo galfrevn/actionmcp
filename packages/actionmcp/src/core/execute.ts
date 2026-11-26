@@ -13,7 +13,9 @@ export interface ToolRuntime {
 export type ToolOutput = AgentResult<unknown>
 
 export function requiresConfirmation(tool: Pick<SerializableToolDef, 'confirm' | 'annotations'>): boolean {
-  return tool.confirm === 'always' || (tool.confirm === 'consequential' && tool.annotations.consequentialHint)
+  if (tool.confirm === 'never') return false
+  if (tool.confirm === 'consequential') return tool.annotations.consequentialHint !== false
+  return true
 }
 
 export async function executeTool(
@@ -25,8 +27,10 @@ export async function executeTool(
   const call: ToolCall = { name: tool.name, input, annotations: tool.annotations, source: 'agent' }
   const startedAt = Date.now()
   let confirmation: ConfirmationOutcome = 'none'
-  const publish = (result: ToolOutput | { aborted: true }) =>
-    publishToolCall({ name: tool.name, input, startedAt, durationMs: Date.now() - startedAt, confirmation, result })
+  let dispatched = false
+  let running: Promise<ToolOutput> | undefined
+  const publish = (result: ToolOutput | { aborted: true }, cancelled: boolean) =>
+    publishToolCall({ name: tool.name, input, startedAt, durationMs: Date.now() - startedAt, confirmation, cancelled, result })
 
   const run = async (): Promise<ToolOutput> => {
     if (requiresConfirmation(tool)) {
@@ -38,6 +42,7 @@ export async function executeTool(
       return fail('blocked', BLOCKED_MESSAGE)
     }
     if (signal.aborted) return fail('failed', GENERIC_FAILURE_MESSAGE)
+    dispatched = true
     const result = await invoke(tool, input, runtime)
     try {
       runtime.onAfterExecute?.(call, result)
@@ -48,11 +53,18 @@ export async function executeTool(
   }
 
   try {
-    const output = await untilAborted(run, signal)
-    publish(output)
+    const output = await untilAborted(() => (running = run()), signal)
+    publish(output, false)
     return output
   } catch (error) {
-    publish({ aborted: true })
+    if (dispatched && running) {
+      void running.then(
+        (output) => publish(output, true),
+        () => publish({ aborted: true }, true),
+      )
+    } else {
+      publish({ aborted: true }, signal.aborted)
+    }
     throw error
   }
 }
@@ -68,7 +80,7 @@ async function isAllowed(onBeforeExecute: NonNullable<ToolRuntime['onBeforeExecu
 
 function callAction(tool: SerializableToolDef, input: unknown): Promise<unknown> {
   const action = tool.action as (...args: unknown[]) => Promise<unknown>
-  if (tool.adapter === 'formdata') return action(undefined, toFormData(input))
+  if (tool.adapter === 'formdata') return action(tool.initialState, toFormData(input))
   if (tool.adapter === 'form') return action(toFormData(input))
   return action(input)
 }

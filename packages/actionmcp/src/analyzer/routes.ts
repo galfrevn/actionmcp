@@ -5,6 +5,7 @@ import type { RouteEntry } from '../core/types'
 import { parseModule, readObjectLiteral, staticString } from './source'
 
 const PAGE_FILE = /^page\.(?:tsx|ts|jsx|js|mdx)$/
+const LAYOUT_FILE = /^layout\.(?:tsx|ts|jsx|js)$/
 const ROUTE_GROUP = /^\([^.].*\)$/
 const INTERCEPTING_ROUTE = /^\(\.{1,3}\)/
 const OPTIONAL_CATCH_ALL = /^\[\[\.\.\.(.+)\]\]$/
@@ -27,42 +28,45 @@ export function scanRoutes(cwd: string, cache: PageMetadataCache = new Map()): R
     return []
   }
   const routes = new Map<string, RouteEntry>()
-  const pages = new Set<string>()
-  visit(appDirectory, [], { routes, pages, cache })
+  const files = new Set<string>()
+  visit(appDirectory, [], [], { routes, files, cache })
   for (const file of cache.keys()) {
-    if (!pages.has(file)) cache.delete(file)
+    if (!files.has(file)) cache.delete(file)
   }
   return [...routes.values()].toSorted((left, right) => compareText(left.pattern, right.pattern))
 }
 
 interface RouteScan {
   routes: Map<string, RouteEntry>
-  pages: Set<string>
+  files: Set<string>
   cache: PageMetadataCache
 }
 
-function visit(directory: string, segments: readonly string[], scan: RouteScan): void {
+function visit(directory: string, segments: readonly string[], staticDepths: readonly number[], scan: RouteScan): void {
   const entries = readdirSync(directory, { withFileTypes: true })
+  const layout = entries.find((entry) => entry.isFile() && LAYOUT_FILE.test(entry.name))
+  const depths =
+    layout && cachedMetadata(join(directory, layout.name), scan).staticParams ? [...staticDepths, segments.length] : staticDepths
   const page = entries.find((entry) => entry.isFile() && PAGE_FILE.test(entry.name))
   if (page) {
-    const pageFile = join(directory, page.name)
-    scan.pages.add(pageFile)
-    const route = toRoute(segments, cachedPageMetadata(pageFile, scan.cache))
+    const { title, staticParams } = cachedMetadata(join(directory, page.name), scan)
+    const route = toRoute(segments, staticParams ? [...depths, segments.length] : depths, title)
     if (!scan.routes.has(route.pattern)) scan.routes.set(route.pattern, route)
   }
   for (const entry of entries) {
     if (!entry.isDirectory() || isExcluded(entry.name, segments.length === 0)) continue
-    visit(join(directory, entry.name), ROUTE_GROUP.test(entry.name) ? segments : [...segments, entry.name], scan)
+    visit(join(directory, entry.name), ROUTE_GROUP.test(entry.name) ? segments : [...segments, entry.name], depths, scan)
   }
 }
 
-function cachedPageMetadata(pageFile: string, cache: PageMetadataCache): PageMetadata {
-  const { mtimeMs, size } = statSync(pageFile)
+function cachedMetadata(file: string, scan: RouteScan): PageMetadata {
+  scan.files.add(file)
+  const { mtimeMs, size } = statSync(file)
   const stamp = `${mtimeMs}:${size}`
-  let cached = cache.get(pageFile)
+  let cached = scan.cache.get(file)
   if (cached?.stamp !== stamp) {
-    cached = { stamp, metadata: readPageMetadata(pageFile) }
-    cache.set(pageFile, cached)
+    cached = { stamp, metadata: readPageMetadata(file) }
+    scan.cache.set(file, cached)
   }
   return cached.metadata
 }
@@ -73,23 +77,21 @@ function isExcluded(name: string, isRoot: boolean): boolean {
   )
 }
 
-function toRoute(segments: readonly string[], metadata: PageMetadata): RouteEntry {
+function toRoute(segments: readonly string[], staticDepths: readonly number[], title: string | undefined): RouteEntry {
   const route: RouteEntry = { pattern: `/${segments.join('/')}`, params: [] }
-  for (const segment of segments) {
+  let covered = true
+  segments.forEach((segment, index) => {
     const optionalCatchAll = OPTIONAL_CATCH_ALL.exec(segment)?.[1]
     const catchAll = CATCH_ALL.exec(segment)?.[1]
     const dynamic = DYNAMIC.exec(segment)?.[1]
-    if (optionalCatchAll !== undefined) {
-      route.params.push(optionalCatchAll)
-      route.optionalCatchAll = optionalCatchAll
-    } else if (catchAll !== undefined) {
-      route.params.push(catchAll)
-      route.catchAll = catchAll
-    } else if (dynamic !== undefined) {
-      route.params.push(dynamic)
-    }
-  }
-  return { ...route, ...metadata }
+    const param = optionalCatchAll ?? catchAll ?? dynamic
+    if (param === undefined) return
+    route.params.push(param)
+    if (optionalCatchAll !== undefined) route.optionalCatchAll = optionalCatchAll
+    else if (catchAll !== undefined) route.catchAll = catchAll
+    if (!staticDepths.some((depth) => depth > index)) covered = false
+  })
+  return { ...route, ...(title ? { title } : {}), ...(route.params.length > 0 && covered ? { staticParams: true } : {}) }
 }
 
 function readPageMetadata(pageFile: string): PageMetadata {
