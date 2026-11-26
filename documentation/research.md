@@ -63,6 +63,7 @@ Rules that shape the design (**Verified**):
 - **`waitForToolsUntil(promise)`** (added 2026-11-24, PR #373): tells consumers to wait until asynchronous registration finishes. Issue #328 proposes that `tools ready` starts as `false`.
 - **`Tool` interface** (2026-11-19, PR #348): `getTools()` returns snapshots. Each `Tool` identifies one concrete registration.
 - **Permissions policy `tools`:** the default is `self`. Cross-origin iframes need `allow="tools"` (Chrome docs, **Verified**).
+- **Rejections are opaque** (**Verified** on 2026-11-26, spike SP8): when a tool's `execute` rejects, `executeTool()` rejects with `OperationError: Tool execution failed.` in Chromium 159 and in the polyfill, whatever the tool threw. See [ADR-015](decisions.md#adr-015-tool-failures-are-results-not-rejections).
 - **Security:** the spec documents prompt injection, *misrepresentation of intent*, and *privacy leakage through over-parameterization*. It describes mitigations with `untrustedContentHint` and `consequentialHint`. It states that agents cannot rely only on the site's annotations.
 
 ### Declarative API (`declarative-api-explainer.md`) **Verified**
@@ -88,9 +89,9 @@ Today a tool call lives in one document and one Promise. If the action navigates
 | Meta Ray-Ban Display | "Coming soon". |
 | Firefox / Safari | Standards positions only. |
 
-Origin Trial token: the standard Chrome mechanism is `<meta http-equiv="origin-trial" content="TOKEN">` or the `Origin-Trial: TOKEN` HTTP header. **Unverified:** whether the WebMCP OT accepts third-party tokens, and whether the `<meta>` tag that React 19 injects into `<head>` reaches the page. It should, because React 19 hoists `<meta>` to the head during SSR.
+Origin Trial token: the standard Chrome mechanism is `<meta http-equiv="origin-trial" content="TOKEN">` or the `Origin-Trial: TOKEN` HTTP header. **Verified** on 2026-11-26 (spike SP7): a `<meta>` that a Server Component renders in the body is in `<head>` in the server HTML. **Unverified:** whether the WebMCP OT accepts third-party tokens, and whether Chrome activates the trial from that tag. This needs a real token on its registered origin.
 
-Chrome flags for e2e: AI SDK verified with `--enable-experimental-web-platform-features --enable-features=WebMCPTesting` in Chrome 157. agent-browser records that Chrome 157 removed the `WebMCPTesting` flag (closed issue #2513). **Unverified:** the correct flag must be pinned per Chrome version. Recommendation: use agent-browser for native e2e, because it already handles this.
+Chrome flags for e2e: AI SDK verified with `--enable-experimental-web-platform-features --enable-features=WebMCPTesting` in Chrome 157. agent-browser records that Chrome 157 removed the `WebMCPTesting` flag (closed issue #2513). **Verified** on 2026-11-26 (spike SP5): Chromium 159.0.8154.6 and Chrome 158 expose the API with `--enable-features=WebMCP`. `WebMCPTesting` has no effect in Chromium 159. `--enable-experimental-web-platform-features` also exposes `waitForToolsUntil` and `resumeTool` in Chromium 159. agent-browser 0.44.0 and 0.45.0 enable WebMCP by default.
 
 Spec churn (evidence): Chrome 160 exposes the tool owner as `source` instead of `window`, and AI SDK had to patch for it (PR #25507, 2026-11-25). The API had already moved from `navigator` to `document` before that.
 
@@ -123,6 +124,8 @@ PRs in `vercel/ai`, all merged on 2026-11-23 except the last (**Verified**):
 
 ## 4. Next.js
 
+- **Redirects** (**Verified** on 2026-11-26, spike SP2): when an action calls `redirect()`, the client Promise rejects with an error whose `digest` is `NEXT_REDIRECT;<type>;<url>;<status>;`, and the router navigates.
+- **Config restarts** (**Verified** on 2026-11-26, spike SP4): `next dev` replaces the server process when `next.config.ts` changes, and evaluates a config function twice per process.
 - **PR #98443** "Add WebMCP development tools and HMR controls" (@gaojude, Next.js team): opened 2026-09-09, still a draft, with no activity since 2026-09-18 (**Verified**).
   - Registers **development** tools: `pause_hmr`, `resume_hmr`, `nextjs_inspect`, and `nextjs_compile_route`, with a Server Action lookup by ID for debugging.
   - Has a test that "preserves application tools". It does not overwrite app tools, but it does not generate them either.
@@ -135,7 +138,7 @@ PRs in `vercel/ai`, all merged on 2026-11-23 except the last (**Verified**):
   - Authentication and authorization go inside each action.
   - Quote: "even if a Server Action … is not imported elsewhere in your code, it can still be called externally".
 - **Sequential dispatch** (**Verified**): "Next.js dispatches Server Actions one at a time per client" (https://nextjs.org/docs/app/guides/server-actions). Implication: tools that use actions queue and do not run in parallel.
-- **Importing Server Functions in the client** (**Verified**): they are defined in a file with `'use server'`, and Client and Server Components can import them. A `'use server'` file can export only async functions, which is why wrapper patterns such as next-safe-action exist. **Unverified:** confirm the exact error message in Next 16.4.
+- **Importing Server Functions in the client** (**Verified**): they are defined in a file with `'use server'`, and Client and Server Components can import them. A `'use server'` file can export only async functions, which is why wrapper patterns such as next-safe-action exist. **Verified** on 2026-11-26 in Next 16.4.6: the runtime check accepts any function, and its message is "A \"use server\" file can only export async functions, found <type>."
 - **Turbopack** (**Verified**, https://nextjs.org/docs/app/api-reference/turbopack): supports webpack loaders (`turbopack.rules`) and automatic Babel if configured. It does not support webpack plugins or `webpack()` in `next.config`. Implication: there is no compile hook with a view of the whole project, so the strategy is codegen ([ADR-001](decisions.md#adr-001-codegen-instead-of-a-compiler-plugin)).
 - **Typed routes** (**Verified**): `typedRoutes` is stable since 15.5. `next typegen` generates `PageProps`, `LayoutProps`, and `RouteContext`. For the `navigate` tool, we scan `app/` ourselves (see [architecture.md](architecture.md#tool-navigate)).
 - Reference version: `vercel/shop` uses `next@16.4.6` and `react@19.3.1`. We use that as the compatibility baseline.

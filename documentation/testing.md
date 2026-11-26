@@ -4,59 +4,63 @@
 
 | Level | Tool | What it covers | Where |
 |---|---|---|---|
-| Unit | Vitest | `core/` (names, schema, results), `server/` (`agent()`, adapters), `analyzer/` (scan and types over code fixtures), `generator/` (snapshots of `registry.ts` and `manifest.json`) | `packages/actionmcp/src/**/*.test.ts` |
-| Integration | Vitest + real `next build` | Fixture apps on Next 16.x: the build passes, the registry is generated, the alias resolves, and the RSC emits the expected definitions (checked in the HTML/RSC payload) | `fixtures/*` |
-| E2E (polyfill) | Playwright (stable Chromium) + `@w3c/webmcp-polyfill` | `getTools()` lists the right tools per route; `executeTool()` calls the action; the UI revalidates; confirmation blocks execution; tools unregister on navigation | `e2e/polyfill/*.spec.ts` |
-| E2E (native) | agent-browser (`webmcp list/invoke`) on Chrome with WebMCP enabled | The same checks as the polyfill, but with Chrome's native implementation (origin trial or flag) | `e2e/native/*.sh` or `.ts` |
-| Manual | ChatGPT Desktop (built-in browser) | Real discovery and execution, behavior with `consequentialHint`, and ChatGPT's own confirmation | checklist in `e2e/manual/chatgpt.md` |
-| Agent evals | agent-browser + model via AI Gateway | End-to-end tasks: success rate, tokens, and time ([testing.md](#demo-and-benchmark)) | `bench/` |
+| Unit | Vitest (Node and jsdom) | `core/` (names, schema, results, execution, the WebMCP layer against the real polyfill), `server/` (`agent()`, registry, adapters), `analyzer/` (scan, types, routes, diagnostics), `generator/`, `cli/`, and the React components | `packages/actionmcp/src/**/*.test.ts(x)` |
+| Integration | Vitest + real `next build` | Every fixture builds with Turbopack and with webpack, the registry matches its snapshot, the alias resolves, the prerendered RSC payload contains the definitions, the build adds no routes, and server-only code is absent from the client bundles. An `AT0xx` error aborts the build. | `tests/integration` |
+| Package | Vitest + `pnpm pack` + npm | The packed tarball installs in a project outside the workspace, the CLI runs, the app builds, and the server returns the definitions. Needs the network. | `tests/package` |
+| E2E (polyfill) | Playwright (Chromium) + `@w3c/webmcp-polyfill` | `getTools()` lists the right tools per route; `executeTool()` calls the action; the UI revalidates; confirmation blocks execution; tools unregister on navigation; the examples and the chat loop work | `e2e/specs/*.spec.ts`, project `polyfill` |
+| E2E (native) | Playwright (Chromium with `--enable-features=WebMCP`) | The same specs with Chromium's native implementation | `e2e/specs/*.spec.ts`, project `native` |
+| Manual | ChatGPT Desktop (built-in browser) | Real discovery and execution, behavior with `consequentialHint`, and ChatGPT's own confirmation. Not run yet. | checklist in `e2e/manual/chatgpt.md` |
+| Agent evals | agent-browser + model via AI Gateway | End-to-end tasks: success rate, tokens, and time ([benchmark](#demo-and-benchmark)). `bench/smoke.ts` checks the harness without a model. | `bench/` |
 
 ## Fixtures (minimal Next apps)
 
 | Fixture | Path | Cases |
 |---|---|---|
-| `fixtures/basic` | A (`agent()`) | Read-only tool, consequential tool, validation error, auth error, `revalidatePath` reflects the change in the UI |
-| `fixtures/formdata` | B + `fromFormDataAction` | `(prevState, formData)` signature, arrays, booleans, `ActionState` return with `error` |
+| `fixtures/basic` | A (`agent()`) | Read-only tool, consequential tool, validation error, auth error, output schema, `revalidatePath` reflects the change in the UI, origin trial `<meta>`, devtools in development |
+| `fixtures/formdata` | B + `fromFormDataAction` and `fromFormAction` | `(prevState, formData)` and `(formData)` signatures, arrays, booleans, `ActionState` return with `error`, the same action used by a form |
 | `fixtures/safe-action` | B + `fromSafeAction` | `serverError`, `validationErrors`, `data` |
-| `fixtures/jsdoc` | C (experimental, opt-in) | Optional fields, enums, unions, per-property JSDoc; `AT102` |
-| `fixtures/scoped` | Scope by route | `<AgentTools include>` in the layouts of `/a` and `/b`; navigating between routes changes `getTools()` and emits `toolchange` |
-| `fixtures/navigate` | `navigate` tool | Static and dynamic routes, route groups; slots and intercepted routes are excluded |
-| `fixtures/redirect` | Action that calls `redirect()` | Documented behavior of the result (see the open question in `architecture.md`) |
-| `fixtures/hostile` | Security | Output with injected instructions; the confirmation blocks execution; no new endpoints |
-| `fixtures/coexist` | Coexistence | UI SDK `registerTools` + our tools + Next.js Devtools: no name clashes |
+| `fixtures/jsdoc` | C (experimental, opt-in) | Optional fields, enums, unions, per-property JSDoc; `AT102`; an untagged export stays private |
+| `fixtures/scoped` | Scope by route | `<AgentTools include>` in the layouts of `/a` and `/b`; navigating between routes changes `getTools()` and emits `toolchange`; a nested page keeps the registration |
+| `fixtures/navigate` | `navigate` tool | Static and dynamic routes, route groups; slots, intercepted routes, private folders, and handlers are excluded; `routes` globs and `prefix` |
+| `fixtures/redirect` | Action that calls `redirect()` | The tool returns `navigatedTo` from the root layout and from a segment that unmounts |
+| `fixtures/hostile` | Security | Output with injected instructions; the confirmation blocks execution; one RPC request per call; no new endpoints |
+| `fixtures/coexist` | Coexistence | A tool registered with `use-webmcp-tool`, hand-registered tools named like the UI SDK and Next.js devtools tools, and an app-installed polyfill. A name that is taken gets the `_2` suffix. The fixture does not install the UI SDK itself. |
 
-## Compatibility matrix (CI)
+## Compatibility matrix
 
-| Dimension | Values |
+| Dimension | What CI runs |
 |---|---|
-| Next.js | 16.x only ([ADR-013](decisions.md#adr-013-supported-nextjs-versions)): 16.2.x, 16.4.x (baseline, the version used by `vercel/shop`), `canary` (nightly job, non-blocking) |
-| React | 19.2, 19.3 |
-| Bundler | Turbopack (default), webpack (`next build --webpack`) |
-| Validators | Zod 4.2+ (4.6.x), Valibot 1.2+ with `@valibot/to-json-schema`, ArkType 2.1.28+ |
-| User TypeScript | 5.9, 6.0, 7.0 (the analyzer uses its own pinned TS 6) |
-| Node | 22, 24 |
-| E2E browser | Chromium + polyfill (always); Chrome with native WebMCP (separate job). **Unverified**: pin the flag for each version. Chrome 157 removed `WebMCPTesting`. |
+| Next.js and React | Integration on 16.4.6 with React 19.3.1 and on 16.2.12 with React 19.2.9. End-to-end on 16.4.6. A nightly, non-blocking job on `canary`. |
+| Bundler | Turbopack and webpack (`next build --webpack`) for every fixture |
+| Validators | Unit tests with Zod 4.6, Valibot 1.5 with `@valibot/to-json-schema` 1.8, and ArkType 2.2 |
+| TypeScript | The analyzer uses its own TypeScript 6.0. The fixtures compile with 6.0. **Unverified**: a project on TypeScript 5.9 or 7.0. |
+| Node | 22 and 24 for unit tests. The scripts in `bench/` need Node 22.18 or later, for type stripping. |
+| E2E browser | Chromium with the polyfill, and Chromium with native WebMCP |
 
-Next.js 15.5 is out of scope for v0.1.
+Next.js 15.5 is out of scope for v0.1. Next.js 16.2.12 with React 19.2.9 was also checked by hand on 2026-11-26 from the packed tarball, with the polyfill and with native WebMCP.
 
 ## Quality criteria
 
-- Minimum 85% coverage in `core/`, `server/`, and `generator/`. E2E tests do not count toward coverage.
+- Minimum 85% coverage in `core/`, `server/`, and `generator/`, enforced by the Vitest thresholds. E2E tests do not count toward coverage.
 - Each `ATxxx` code has at least one positive and one negative test.
-- Snapshot of the generated `registry.ts` for each fixture, because codegen changes must be deliberate.
-- Performance budget:
-  - `generate` on a 500-file app takes less than 1.5 s cold (without TS) and less than 4 s with the JSDoc path;
-  - in watch mode, the incremental time is under 300 ms;
-  - the client bundle of `Registrar` + `Confirm` is under 4 KB gzip (without the polyfill).
-- No test depends on the network or on LLMs. The agent evals are the exception, and they run in a manual or nightly job.
+- Snapshot of the generated `registry.ts` for each fixture in `tests/integration/__snapshots__`, because codegen changes must be deliberate.
+- Performance budget, enforced by tests:
+  - `generate` on a 500-file app takes less than 1.5 s cold (without TS) and less than 4 s with the JSDoc path (`src/generator/performance.test.ts`). On an Apple M-series laptop on 2026-11-26 the measured times were about 120 ms and 550 ms;
+  - in watch mode, the incremental time is under 300 ms (`src/generator/watch.test.ts`);
+  - the client bundle of `Registrar` + `Confirm` is under 4 KB gzip without the polyfill (`src/react/bundle-size.test.ts`). It measured 3,072 bytes on 2026-11-26.
+- No unit, integration, or end-to-end test depends on the network or on LLMs. The package test and the agent evals are the exceptions.
 
-## How to run (once the code exists)
+## How to run
 
 ```bash
-pnpm test                 # unit
-pnpm test:integration     # next build over fixtures
-pnpm test:e2e             # Playwright + polyfill
-pnpm test:e2e:native      # agent-browser + Chrome WebMCP (requires a compatible Chrome)
+pnpm build                # build the package first; the apps import its dist folder
+pnpm test                 # unit, with coverage thresholds
+pnpm test:integration     # next build over fixtures, both bundlers
+pnpm build:fixtures && pnpm build:examples
+pnpm test:e2e             # Playwright with the polyfill
+pnpm test:e2e:native      # Playwright with Chromium's native WebMCP
+pnpm test:package         # packed tarball in an npm project (needs the network)
+pnpm bench:smoke          # benchmark harness without a model
 pnpm bench                # agent evals (requires AI_GATEWAY_API_KEY)
 ```
 
@@ -68,7 +72,11 @@ The original plan proposed a demo on Vercel Shop. **Dropped:** `vercel/shop` alr
 
 The open space is custom apps (SaaS, dashboards, internal tools). No platform gives them tools, and their actions are already Server Functions.
 
-### Demo app: fork of `nextjs/saas-starter`
+### Demo app in this repository
+
+The demo that ships today is `bench/app`: the fallback from [ADR-009](decisions.md#adr-009-the-demo-is-a-saas-app-not-a-commerce-app), a minimal team and account app with the same five tools and a JSON file as its database. The fork described below is still planned.
+
+### Planned demo app: fork of `nextjs/saas-starter`
 
 - MIT license, 16.3k stars. It is the reference SaaS template in the Next.js ecosystem: auth, teams, roles, Stripe.
 - Its actions (`app/(login)/actions.ts`) use `validatedAction` / `validatedActionWithUser` with Zod and the `(prevState, formData)` signature. This is the most common real-world pattern, so the demo exercises path B (`defineAgentTools` + `fromFormDataAction`).
@@ -97,6 +105,7 @@ How much does a real browser agent improve (tokens, time, success rate) when a N
 
 #### Design
 
+- **Status:** the harness is in `bench/` and `bench/smoke.ts` passes. No model run has been done, so there are no results.
 - **Harness:** agent-browser (vercel-labs), which supports WebMCP natively.
   - **Mode A (baseline):** `--no-webmcp` (accessibility tree snapshot + clicks).
   - **Mode B:** WebMCP enabled (`webmcp list/invoke`).
