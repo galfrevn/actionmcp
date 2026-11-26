@@ -13,13 +13,13 @@ The route rejects a request with more than 32 tool definitions, with invalid def
 
 ## Run
 
-The assistant needs a model. The example uses the Vercel AI Gateway.
+The assistant needs a model. The example uses OpenRouter or the Vercel AI Gateway.
 
 ```bash
 cp examples/chat/.env.example examples/chat/.env.local
 ```
 
-Set `AI_GATEWAY_API_KEY` in `examples/chat/.env.local`. `AI_MODEL` is optional and takes any model identifier that the gateway serves.
+Set `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY` in `examples/chat/.env.local`. If both are set, OpenRouter is used. `AI_MODEL` is optional and takes any model identifier that the provider serves.
 
 ```bash
 pnpm install
@@ -43,4 +43,5 @@ Open http://localhost:3000, select "Sign in as demo", and ask the assistant to a
 - `app/use-page-tools-chat.ts`: the WebMCP transport, `useChat`, and the tool call loop.
 - `app/chat.tsx`: the chat UI.
 - `app/api/chat/route.ts`: the model call.
+- `lib/model.ts`: the choice between OpenRouter and the AI Gateway.
 - `app/actions.ts`: the tools.
