@@ -46,7 +46,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 - Budgets, enforced by tests:
   - the generator handles a 500-file app in under 1.5 s cold, and in under 4 s with `@agent` tools (`src/generator/performance.test.ts`);
   - in watch mode, a change regenerates in under 300 ms (`src/generator/watch.test.ts`);
-  - the client code for registration and confirmation is under 4 KB gzip, without the polyfill (`src/react/bundle-size.test.ts`).
+  - the client code for registration, confirmation, and error recovery is under 4.5 KB gzip, without the polyfill (`src/react/bundle-size.test.ts`).
 - Unit, integration, and end-to-end tests do not use the network or a model.
 
 ## How to run
