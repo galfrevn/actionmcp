@@ -58,7 +58,14 @@ The `clicks` mode shows no dialog, because the UI forms call the actions directl
 
 ## Results
 
-One run exists so far: [`results/2026-11-26`](results/2026-11-26/summary.md), with `anthropic/claude-sonnet-5.5` through OpenRouter, 20 runs per task and mode, 200 runs in total. The raw log is [`runs.jsonl`](results/2026-11-26/runs.jsonl).
+Two runs exist, both through OpenRouter, with 20 runs per task and mode and 200 runs each. Every run is in the `runs.jsonl` of its folder.
+
+| Run | Model | Commit |
+|---|---|---|
+| [`results/2026-11-26`](results/2026-11-26/summary.md) | `anthropic/claude-sonnet-5.5` | `7cb6bcb` |
+| [`results/2026-11-26-deepseek-v4.1-flash`](results/2026-11-26-deepseek-v4.1-flash/summary.md) | `deepseek/deepseek-v4.1-flash-1017` | `27a6706` |
+
+### `anthropic/claude-sonnet-5.5`
 
 | Task | Success, clicks | Success, WebMCP | Median tokens, clicks | Median tokens, WebMCP | Median time, clicks | Median time, WebMCP |
 |---|---|---|---|---|---|---|
@@ -68,14 +75,31 @@ One run exists so far: [`results/2026-11-26`](results/2026-11-26/summary.md), wi
 | `list-owners` | 20/20 | 20/20 | 6,273 | 9,201 | 3.0 s | 3.8 s |
 | `composite` | 17/20 | 20/20 | 187,717 | 16,355 | 27.4 s | 7.5 s |
 
-What the run shows, for this app and this model:
+The three failures were all `composite` runs in the clicks mode. In each, the database had no invitation for `sam@example.com`.
 
-- On the two single-step mutations and on the composite task, the WebMCP mode used between 2.3 and 11.5 times fewer tokens and was between 2.1 and 3.6 times faster at the median.
-- On `remove-member` the two modes were close: 1.2 times fewer tokens with WebMCP, and a slightly longer median time.
-- On the read-only task `list-owners`, the clicks mode was cheaper and faster. One page snapshot answers the question, while the WebMCP mode lists the tools first and then calls one.
-- The three failures were all `composite` runs in the clicks mode. In each, the database had no invitation for `sam@example.com`.
+### `deepseek/deepseek-v4.1-flash-1017`
 
-Read these numbers with the limits below. The run has not been repeated with a second model, and the machine also ran other light commands during the run, which can affect the times but not the token counts.
+| Task | Success, clicks | Success, WebMCP | Median tokens, clicks | Median tokens, WebMCP | Median time, clicks | Median time, WebMCP |
+|---|---|---|---|---|---|---|
+| `invite-member` | 20/20 | 20/20 | 26,248 | 10,191 | 8.8 s | 10.1 s |
+| `rename-account` | 20/20 | 20/20 | 8,271 | 16,486 | 10.5 s | 13.2 s |
+| `remove-member` | 20/20 | 20/20 | 13,691 | 14,673 | 8.6 s | 8.8 s |
+| `list-owners` | 20/20 | 20/20 | 5,820 | 6,529 | 6.1 s | 5.6 s |
+| `composite` | 20/20 | 20/20 | 67,199 | 16,160 | 19.5 s | 9.5 s |
+
+### What the two runs show
+
+For this app and these two models:
+
+- **`composite`.** The WebMCP mode used fewer tokens and less time with both models: 11.5 times fewer tokens and 3.6 times faster with Sonnet, 4.2 times fewer tokens and 2.1 times faster with DeepSeek. Only Sonnet failed in the clicks mode, in 3 of 20 runs.
+- **`invite-member`.** The WebMCP mode used fewer tokens with both models: 3.7 times fewer with Sonnet and 2.6 times fewer with DeepSeek. It was faster with Sonnet and slower with DeepSeek.
+- **`rename-account`.** The models disagree. With Sonnet the WebMCP mode used 2.3 times fewer tokens. With DeepSeek it used 2.0 times more.
+- **`remove-member`.** The two modes were close with both models, within 1.2 times in tokens.
+- **`list-owners`.** The clicks mode used fewer tokens with both models. One page snapshot answers the question, while the WebMCP mode lists the tools first and then calls one.
+
+The two runs agree on the multi-step task and on the read-only task. They do not support a general claim that the WebMCP mode is cheaper for a single-step mutation.
+
+Read these numbers with the limits in each summary. During both runs the machine also ran other light commands, which can affect the times but not the token counts.
 
 ## Rules for publishing results
 
