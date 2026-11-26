@@ -1,5 +1,4 @@
 import { join, relative, sep } from 'node:path'
-import type { NextConfig } from 'next'
 import { resolveConfig, type AgentToolsConfig, type ResolvedConfig } from './analyzer/config'
 import { formatDiagnostic, hasErrors, type Diagnostic } from './analyzer/diagnostics'
 import { REGISTRY_FILE, generate } from './generator/index'
@@ -8,8 +7,22 @@ import { recordConfig } from './next/config-store'
 
 export type { AgentToolsConfig } from './analyzer/config'
 
-type NextConfigContext = { defaultConfig: NextConfig }
-type NextConfigFunction = (phase: string, context: NextConfigContext) => NextConfig | Promise<NextConfig>
+export interface ConfigContext {
+  defaultConfig: object
+}
+
+export type ConfigFunction<Config extends object> = (phase: string, context: ConfigContext) => Config | Promise<Config>
+
+interface WebpackConfiguration {
+  resolve?: { alias?: Record<string, unknown> }
+}
+
+type WebpackHook = (configuration: WebpackConfiguration, context: unknown) => unknown
+
+interface AliasableConfig {
+  turbopack?: { resolveAlias?: Record<string, unknown> }
+  webpack?: WebpackHook | null
+}
 
 export const REGISTRY_ALIAS = 'actionmcp/registry'
 
@@ -21,31 +34,28 @@ type PreparedStore = { [PREPARED]?: Map<string, Promise<void>> }
 
 export function withAgentTools(options: AgentToolsConfig = {}) {
   recordConfig(options)
-  return (nextConfig: NextConfig | NextConfigFunction = {}): NextConfigFunction =>
+  return <Config extends object = object>(nextConfig?: Config | ConfigFunction<Config>): ConfigFunction<Config> =>
     async (phase, context) => {
-      const base = typeof nextConfig === 'function' ? await nextConfig(phase, context) : nextConfig
+      const base = typeof nextConfig === 'function' ? await nextConfig(phase, context) : (nextConfig ?? ({} as Config))
       const config = resolveConfig(options, process.cwd())
       await prepareOnce(phase, config)
       return applyRegistryAlias(base, config)
     }
 }
 
-export function applyRegistryAlias(nextConfig: NextConfig, config: ResolvedConfig): NextConfig {
+export function applyRegistryAlias<Config extends object>(nextConfig: Config, config: ResolvedConfig): Config {
   const registry = join(config.outDir, REGISTRY_FILE)
   const relativeRegistry = `./${relative(config.cwd, registry).split(sep).join('/')}`
-  const userWebpack = nextConfig.webpack
-  return {
-    ...nextConfig,
-    turbopack: {
-      ...nextConfig.turbopack,
-      resolveAlias: { ...nextConfig.turbopack?.resolveAlias, [REGISTRY_ALIAS]: relativeRegistry },
-    },
-    webpack(webpackConfig, webpackContext) {
-      webpackConfig.resolve ??= {}
-      webpackConfig.resolve.alias = { ...webpackConfig.resolve.alias, [REGISTRY_ALIAS]: registry }
-      return userWebpack ? userWebpack(webpackConfig, webpackContext) : webpackConfig
+  const { turbopack, webpack: userWebpack }: AliasableConfig = nextConfig
+  const aliased: AliasableConfig = {
+    turbopack: { ...turbopack, resolveAlias: { ...turbopack?.resolveAlias, [REGISTRY_ALIAS]: relativeRegistry } },
+    webpack(configuration, context) {
+      configuration.resolve ??= {}
+      configuration.resolve.alias = { ...configuration.resolve.alias, [REGISTRY_ALIAS]: registry }
+      return userWebpack ? userWebpack(configuration, context) : configuration
     },
   }
+  return { ...nextConfig, ...aliased }
 }
 
 function prepareOnce(phase: string, config: ResolvedConfig): Promise<void> {
