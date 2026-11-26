@@ -8,6 +8,7 @@ export interface ToolCallRecord {
   startedAt: number
   durationMs: number
   confirmation: ConfirmationOutcome
+  cancelled: boolean
   result: AgentResult<unknown> | { aborted: true }
 }
 

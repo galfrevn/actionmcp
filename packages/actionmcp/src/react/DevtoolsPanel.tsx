@@ -174,6 +174,7 @@ export function DevtoolsPanel(): ReactNode {
             <details key={`${record.startedAt}:${record.name}`} data-actionmcp-devtools="call">
               <summary>
                 {record.name} · {record.durationMs} ms · confirmation {record.confirmation}
+                {record.cancelled ? ' · cancelled by the agent' : ''}
               </summary>
               <pre style={styles.code}>{format({ input: record.input, result: record.result })}</pre>
             </details>

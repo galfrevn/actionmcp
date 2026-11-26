@@ -180,7 +180,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
 5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
-6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. A Server Function in flight cannot be cancelled.
+6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. An action that was already called cannot be cancelled, even while it waits in the Next.js queue. It runs to the end, `onAfterExecute` receives its result, and the devtools panel records the result with "cancelled by the agent". The agent never receives that result, so a retry runs the action a second time.
 
 Next.js dispatches Server Functions one at a time per client, so a tool call queues behind other actions, including the ones the UI starts.
 

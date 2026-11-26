@@ -22,6 +22,7 @@ The guiding principle: exposing a Server Function as a tool must not add attack 
 - **Authentication.** Each action must check the session itself. A tool call arrives with the user's cookies, exactly like a call from your UI.
 - **Authorization and ownership checks.** An action that trusts an ID from its input lets one user change another user's data. This is the same bug with or without actionmcp.
 - **Rate limiting.** An agent in a loop can call a tool many times. Limit expensive actions inside the action.
+- **Deduplicating retries.** An agent that cancels a call after the action started receives `AbortError`, and the action still runs to the end. If the agent retries, the action runs again. Make a consequential action idempotent, for example with a request key in its input that the action stores.
 - **Defending the agent against prompt injection.** actionmcp marks untrusted output and asks a human before consequential actions. It cannot stop an agent from reading a hostile comment.
 
 ## Checklist for each tool

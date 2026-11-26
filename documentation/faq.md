@@ -87,6 +87,10 @@ Only when you list existing actions in `agent-tools.ts`. A `'use server'` file c
 
 No. Next.js dispatches Server Actions one at a time per client, so a tool call queues behind other actions, including the ones your UI starts. An action in flight cannot be cancelled.
 
+## What happens when an agent cancels a tool call?
+
+If the action has not been called yet, it never runs, and an open confirmation closes. If the action was already called, the agent receives `AbortError` but the action runs to the end, even when it was still waiting in the queue. `onAfterExecute` receives its result, and the devtools panel marks the call "cancelled by the agent". An agent that retries runs the action a second time, so make consequential actions idempotent.
+
 ## How do I avoid name clashes with other tools on the page?
 
 Use `prefix`: `<AgentTools prefix="acme." />`. actionmcp reserves `snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, and `navigate`. If another library has already registered a name, the tool is registered with a `_2` suffix and a warning is logged in development.

@@ -1,6 +1,7 @@
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { publishToolCall } from '../core/events'
 import { succeed } from '../core/result'
 import type { SerializableToolDef } from '../core/types'
 import { loadPolyfill } from '../core/webmcp'
@@ -94,6 +95,25 @@ describe('DevtoolsPanel', () => {
     expect(listTodos.action).toHaveBeenCalledWith({ limit: 3 })
     expect(JSON.parse(find('[data-actionmcp-devtools="output"]').textContent ?? '')).toEqual({ ok: true, data: { limit: 3 } })
     expect(find('[data-actionmcp-devtools="call"] summary').textContent).toMatch(/^listTodos · \d+ ms · confirmation none$/)
+  })
+
+  it('marks a call that the agent cancelled', async () => {
+    await render(<DevtoolsPanel />)
+    await click(find('[data-actionmcp-devtools="toggle"]'))
+    await act(async () =>
+      publishToolCall({
+        name: 'charge',
+        input: {},
+        startedAt: 1,
+        durationMs: 5,
+        confirmation: 'accepted',
+        cancelled: true,
+        result: { ok: true, data: { charged: true } },
+      }),
+    )
+    expect(find('[data-actionmcp-devtools="call"] summary').textContent).toBe(
+      'charge · 5 ms · confirmation accepted · cancelled by the agent',
+    )
   })
 
   it('shows the error when the input is not JSON', async () => {

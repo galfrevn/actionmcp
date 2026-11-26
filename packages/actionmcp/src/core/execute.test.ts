@@ -231,6 +231,33 @@ describe('executeTool', () => {
     expect(tool.action).not.toHaveBeenCalled()
   })
 
+  it('rejects a cancelled call whose action is running and still reports the result of the action', async () => {
+    const records = recordCalls()
+    let finish: (value: unknown) => void = () => {}
+    const tool = createTool({ confirm: 'never', action: vi.fn(() => new Promise((resolve) => (finish = resolve))) })
+    const onAfterExecute = vi.fn()
+    const controller = new AbortController()
+    const execution = executeTool(tool, { id: 1 }, controller.signal, createRuntime({ onAfterExecute }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(tool.action).toHaveBeenCalledOnce()
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(records).toEqual([])
+    finish(succeed({ charged: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onAfterExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'deleteAccount' }), { ok: true, data: { charged: true } })
+    expect(records.map((record) => [record.cancelled, record.result])).toEqual([[true, { ok: true, data: { charged: true } }]])
+  })
+
+  it('marks a call cancelled before its action ran', async () => {
+    const records = recordCalls()
+    const controller = new AbortController()
+    const execution = executeTool(createTool(), {}, controller.signal, createRuntime({ confirm: () => new Promise<boolean>(() => {}) }))
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(records.map((record) => [record.cancelled, record.result])).toEqual([[true, { aborted: true }]])
+  })
+
   it('publishes a record for each call', async () => {
     const records = recordCalls()
     await executeTool(createTool(), { id: 1 }, neverAborted(), createRuntime())
@@ -244,5 +271,6 @@ describe('executeTool', () => {
       ['deleteAccount', 'none', { aborted: true }],
     ])
     expect(records.every((record) => record.durationMs >= 0)).toBe(true)
+    expect(records.map((record) => record.cancelled)).toEqual([false, false, true])
   })
 })
