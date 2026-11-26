@@ -95,7 +95,9 @@ describe('Registrar', () => {
 
   it('exposes the definition without internal fields', async () => {
     const inputSchema = { type: 'object', properties: { id: { type: 'string' } } }
-    await render(<Registrar tools={[createTool({ title: 'Delete account', inputSchema, adapter: 'formdata' })]} />)
+    await render(
+      <Registrar tools={[createTool({ title: 'Delete account', inputSchema, adapter: 'formdata', initialState: { secret: 1 } })]} />,
+    )
     const [tool] = await context.getTools()
     expect(tool).toMatchObject({
       name: 'deleteAccount',
@@ -104,6 +106,11 @@ describe('Registrar', () => {
       inputSchema,
       annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false },
     })
+    const registerTool = vi.spyOn(context, 'registerTool')
+    await render(<Registrar tools={[createTool({ name: 'other', adapter: 'formdata', initialState: { secret: 1 } })]} />)
+    expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty('initialState')
+    expect(registerTool.mock.calls[0]?.[0]).not.toHaveProperty('adapter')
+    registerTool.mockRestore()
   })
 
   it('logs a tool that the browser rejects in development', async () => {

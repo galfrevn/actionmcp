@@ -86,7 +86,7 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
     const controller = new AbortController()
     const { signal } = controller
     const definitions = stable.tools.map(
-      ({ action: _action, confirm: _confirm, adapter: _adapter, ...definition }, index): ModelContextTool => ({
+      ({ action: _action, confirm: _confirm, adapter: _adapter, initialState: _initialState, ...definition }, index): ModelContextTool => ({
         ...definition,
         execute: (input, options) => {
           const state = latest.current

@@ -79,6 +79,7 @@ function resolveEntry(entry: RegistryEntry): SerializableToolDef {
     ...(inputSchema ? { inputSchema } : {}),
     ...(outputSchema ? { outputSchema: wrapOutputSchema(outputSchema) } : {}),
     ...(entry.adapter ? { adapter: entry.adapter } : {}),
+    ...(entry.initialState === undefined ? {} : { initialState: entry.initialState }),
   }
 }
 

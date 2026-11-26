@@ -21,6 +21,7 @@ export interface SerializableToolDef {
   annotations: ToolAnnotations
   confirm: ConfirmPolicy
   adapter?: ToolAdapter
+  initialState?: unknown
   action: ServerFunction
 }
 

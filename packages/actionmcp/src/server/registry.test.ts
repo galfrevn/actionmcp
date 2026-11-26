@@ -70,6 +70,14 @@ describe('tool', () => {
     ).toBe('form')
   })
 
+  it('keeps the initial state of a FormData action', () => {
+    const definition = tool(fromFormDataAction(inviteTeamMember, { initialState: { message: '' } }), { description: 'Invite a member.' })
+    expect(definition).toMatchObject({ adapter: 'formdata', initialState: { message: '' } })
+    expect('initialState' in tool(fromFormDataAction(inviteTeamMember), { description: 'Invite a member.' })).toBe(false)
+    const [entry] = defineAgentTools({ invite: definition }).entries
+    expect(entry?.initialState).toEqual({ message: '' })
+  })
+
   it('rejects an empty description', () => {
     expect(() => tool(plainAction, { description: ' ' })).toThrow('non-empty description')
   })

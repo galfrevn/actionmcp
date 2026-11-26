@@ -95,9 +95,11 @@ export default defineAgentTools({
 
 | Function | Wraps | The browser calls |
 |---|---|---|
-| `fromFormDataAction(action)` | `(previousState, formData) => Promise<State>` | `action(undefined, formData)` |
+| `fromFormDataAction(action, { initialState })` | `(previousState, formData) => Promise<State>` | `action(initialState, formData)`. `initialState` is `undefined` when you leave it out |
 | `fromFormAction(action)` | `(formData) => Promise<unknown>` | `action(formData)` |
 | `fromSafeAction(action)` | a next-safe-action action | `action(input)`, then unwraps `data`, `serverError`, and `validationErrors` |
+
+Pass `initialState` when the action reads its previous state, as in `fromFormDataAction(createInvoice, { initialState: { message: null, errors: {} } })`. It must be a value that React can pass to a Client Component, because the browser calls the action.
 
 The `FormData` is built from the agent's input object: an array becomes repeated keys, `true` becomes `'on'`, `false`, `null`, and `undefined` are omitted, and a nested object becomes a JSON string.
 

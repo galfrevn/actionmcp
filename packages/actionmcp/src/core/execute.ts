@@ -80,7 +80,7 @@ async function isAllowed(onBeforeExecute: NonNullable<ToolRuntime['onBeforeExecu
 
 function callAction(tool: SerializableToolDef, input: unknown): Promise<unknown> {
   const action = tool.action as (...args: unknown[]) => Promise<unknown>
-  if (tool.adapter === 'formdata') return action(undefined, toFormData(input))
+  if (tool.adapter === 'formdata') return action(tool.initialState, toFormData(input))
   if (tool.adapter === 'form') return action(toFormData(input))
   return action(input)
 }

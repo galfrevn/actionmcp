@@ -182,6 +182,13 @@ describe('executeTool', () => {
     expect(formData?.get('notify')).toBe('on')
   })
 
+  it('passes the initial state of a FormData action', async () => {
+    const action = vi.fn(async (previous: { count: number }, _formData: FormData) => ({ count: previous.count + 1 }))
+    const tool = createTool({ adapter: 'formdata', confirm: 'never', initialState: { count: 1 }, action })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual({ ok: true, data: { count: 2 } })
+    expect(action.mock.calls[0]?.[0]).toEqual({ count: 1 })
+  })
+
   it('calls a form action with (FormData)', async () => {
     const action = vi.fn(async (formData: FormData) => ({ title: String(formData.get('title')) }))
     const tool = createTool({ adapter: 'form', confirm: 'never', action })

@@ -156,6 +156,7 @@ interface SerializableToolDef {
   annotations: { readOnlyHint: boolean; consequentialHint: boolean; untrustedContentHint: boolean }
   confirm: 'always' | 'consequential' | 'never'
   adapter?: 'formdata' | 'form' | 'safe-action'
+  initialState?: unknown
   action: (...args: never[]) => Promise<unknown>
 }
 ```
@@ -179,7 +180,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 
 1. **Confirmation.** The page shows the confirmation component unless `confirm` is `'never'`, or it is `'consequential'` and the tool is not consequential. A value that is not one of the three policies asks for confirmation. The default dialog lists each field of the input with its value, in the order of the input schema, and then the fields that the schema does not declare. The label of a declared field is the `title` of its property in the input schema, or the field name. An undeclared field is labeled with its name and "not in the schema". The confirmations of every `<AgentTools />` on the page share one queue, so one dialog is visible at a time. The `<AgentTools />` that registered the tool renders the dialog, with the `AgentToolsProvider` above it. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
 2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`, and so does a hook that throws.
-3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
+3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(initialState, formData)`, where `initialState` comes from `fromFormDataAction()` and is `undefined` by default. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
 5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
 6. **Cancellation.** If the consumer aborts, the call rejects with `AbortError` and an open confirmation closes. An action that was already called cannot be cancelled, even while it waits in the Next.js queue. It runs to the end, `onAfterExecute` receives its result, and the devtools panel records the result with "cancelled by the agent". The agent never receives that result, so a retry runs the action a second time.
