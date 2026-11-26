@@ -82,7 +82,7 @@
     "webmcp-types": "^0.2.0"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@valibot/to-json-schema": "^1.8.0",
