@@ -1,6 +1,6 @@
 export type ConfirmPolicy = 'always' | 'consequential' | 'never'
 
-export type ToolAdapter = 'formdata' | 'safe-action'
+export type ToolAdapter = 'formdata' | 'form' | 'safe-action'
 
 export type JsonSchema = Record<string, unknown>
 

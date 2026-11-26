@@ -2,6 +2,7 @@ export { agent, type AgentTool, type AgentToolMarker, type AgentToolOptions, typ
 export {
   createRegistry,
   defineAgentTools,
+  fromFormAction,
   fromFormDataAction,
   fromSafeAction,
   tool,

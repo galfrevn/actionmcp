@@ -60,11 +60,16 @@ export async function executeTool(
   }
 }
 
-async function invoke(tool: SerializableToolDef, input: unknown, runtime: ToolRuntime): Promise<ToolOutput> {
+function callAction(tool: SerializableToolDef, input: unknown): Promise<unknown> {
   const action = tool.action as (...args: unknown[]) => Promise<unknown>
+  if (tool.adapter === 'formdata') return action(undefined, toFormData(input))
+  if (tool.adapter === 'form') return action(toFormData(input))
+  return action(input)
+}
+
+async function invoke(tool: SerializableToolDef, input: unknown, runtime: ToolRuntime): Promise<ToolOutput> {
   try {
-    const raw = await (tool.adapter === 'formdata' ? action(undefined, toFormData(input)) : action(input))
-    return normalizeActionResult(raw, tool.adapter)
+    return normalizeActionResult(await callAction(tool, input), tool.adapter)
   } catch (error) {
     return runtime.recoverError?.(error) ?? fail('failed', error instanceof Error && error.message ? error.message : GENERIC_FAILURE_MESSAGE)
   }

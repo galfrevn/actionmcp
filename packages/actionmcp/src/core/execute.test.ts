@@ -129,6 +129,16 @@ describe('executeTool', () => {
     expect(formData?.get('notify')).toBe('on')
   })
 
+  it('calls a form action with (FormData)', async () => {
+    const action = vi.fn(async (formData: FormData) => ({ title: String(formData.get('title')) }))
+    const tool = createTool({ adapter: 'form', confirm: 'never', action })
+    await expect(executeTool(tool, { title: 'Hello' }, neverAborted(), createRuntime())).resolves.toEqual({
+      ok: true,
+      data: { title: 'Hello' },
+    })
+    expect(action.mock.calls[0]).toHaveLength(1)
+  })
+
   it('unwraps a safe-action result', async () => {
     const tool = createTool({ adapter: 'safe-action', confirm: 'never', action: async () => ({ data: { id: 3 } }) })
     await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual({ ok: true, data: { id: 3 } })

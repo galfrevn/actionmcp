@@ -67,6 +67,10 @@ export function fromFormDataAction(
   return { action, adapter: 'formdata' }
 }
 
+export function fromFormAction(action: (formData: FormData) => Promise<unknown>): AdaptedAction {
+  return { action, adapter: 'form' }
+}
+
 export function fromSafeAction(action: (input: never) => Promise<unknown>): AdaptedAction {
   return { action, adapter: 'safe-action' }
 }

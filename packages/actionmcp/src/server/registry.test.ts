@@ -8,6 +8,7 @@ import { invitations, inviteTeamMember, inviteTeamMemberSchema } from './__fixtu
 import {
   createRegistry,
   defineAgentTools,
+  fromFormAction,
   fromFormDataAction,
   fromSafeAction,
   isAgentToolRegistry,
@@ -61,6 +62,7 @@ describe('tool', () => {
     expect(definition.adapter).toBe('formdata')
     expect(definition.action).toBe(inviteTeamMember)
     expect(tool(fromSafeAction(loginUser), { description: 'Sign in.' }).adapter).toBe('safe-action')
+    expect(tool(fromFormAction(async (_formData: FormData) => undefined), { description: 'Post.' }).adapter).toBe('form')
   })
 
   it('rejects an empty description', () => {
