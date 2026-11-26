@@ -14,6 +14,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - In development, the warning for a taken tool name says when two `<AgentTools />` on the page register the same tool, and suggests `include` or `exclude`.
 - The `cwd` option of `withAgentTools()`, for `next build apps/web` and other runs from outside the project directory. `withAgentTools()` warns when the project directory has no `app` or `src/app` directory. Before, such a run analyzed the directory where `next` ran and found no tools, with no message.
 - The `initialState` option of `fromFormDataAction()`, the previous state that the browser passes to the action. Before, the action always received `undefined`, so an action that read `previousState` failed.
+- In development, `<AgentTools />` warns once when the page is not a secure context, such as `http://192.168.1.20:3000`, because WebMCP and the polyfill do not exist there.
 
 ### Changed
 
@@ -43,6 +44,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - In watch mode, a scan root such as `lib/` and a default registry file such as `agent-tools.ts` that are created after the start are watched and analyzed. Before, they needed a restart.
 - A tool in a `.mts` file is an `AT004` error that asks to rename the file to `.ts`. Next.js does not apply `'use server'` to `.mts` files, so before, the generated registry passed a plain function to the client and `next build` failed while prerendering.
 - A failed import of the polyfill is logged, and the next `<AgentTools />` that mounts loads it again. Before, the failure stayed cached until a reload and produced an unhandled promise rejection.
+- The devtools panel reports "native" only when `registerTool` and the constructor of `document.modelContext` are browser functions. Before, a context built by a script around a bound function showed as native.
 
 ## 0.2.0
 
