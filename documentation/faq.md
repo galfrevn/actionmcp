@@ -67,6 +67,8 @@ Yes. Pass `confirmLabels` to `AgentToolsProvider`. The [API reference](api-refer
 
 The analyzer registers an `agent()` call only when it is the value of an exported top-level `const` or of the default export. A call inside a factory function, or wrapped in another call, produces the `AT109` warning and no tool. Wrap the handler and keep `agent()` at the top level, or list the function that your factory returns in `agent-tools.ts`.
 
+The analyzer also reads only the files that the `scan` globs cover, which are `app/**`, `lib/**`, and `src/**` by default. A tool in another folder, such as `actions/`, produces the `AT110` warning and no tool. Add the folder to the `scan` option of `withAgentTools()`.
+
 ## Which validators work?
 
 Any validator that implements Standard JSON Schema: Zod 4.2 or later, ArkType 2.1.28 or later, and Valibot 1.2 or later through `toStandardJsonSchema()` from `@valibot/to-json-schema`. Zod 3 does not implement it.

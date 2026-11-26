@@ -22,6 +22,7 @@ export interface ModuleScan {
   typeRequests: TypeRequest[]
   diagnostics: Diagnostic[]
   usesNavigate: boolean
+  plainFunctions: string[]
 }
 
 type AnyFunction = FunctionNode | ArrowFunctionExpression
@@ -59,13 +60,25 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
     componentNames: new Set(),
     declarations: new Map(),
     exports: new Map(),
-    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false },
+    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [] },
   }
   indexModule(context)
   scanAgentCalls(context)
   if (options.jsdoc) scanAgentTags(context)
   context.scan.usesNavigate = usesNavigate(context)
+  context.scan.plainFunctions = plainFunctionExports(context)
   return context.scan
+}
+
+function plainFunctionExports(context: ModuleContext): string[] {
+  const names = new Set<string>()
+  for (const [localName, exportName] of context.exports) {
+    if (asFunction(context.declarations.get(localName))) names.add(exportName)
+  }
+  for (const statement of context.module.program.body) {
+    if (statement.type === 'ExportDefaultDeclaration' && asFunction(statement.declaration)) names.add('default')
+  }
+  return [...names].toSorted()
 }
 
 function indexModule(context: ModuleContext): void {

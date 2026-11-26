@@ -177,7 +177,7 @@ The labels are plain strings, so a Server Component can pass translated text.
 | Option | Type | Default | Meaning |
 |---|---|---|---|
 | `registry` | `string` | `./agent-tools.ts` if it exists | The explicit registry file. |
-| `scan` | `string[]` | `['app/**', 'lib/**', 'src/**']` | Globs to scan for `agent()` and `@agent`. |
+| `scan` | `string[]` | `['app/**', 'lib/**', 'src/**']` | Globs to scan for `agent()` and `@agent`. A tool in a file outside these globs is not registered and produces `AT110`. |
 | `outDir` | `string` | `.agent-tools` | Where the registry and the manifest are written. |
 | `jsdoc` | `boolean` | `false` | Enables the experimental `@agent` path. |
 | `auth` | `string[]` | common names such as `auth` and `requireUser` | Function names that count as an auth check for `AT105`. |
@@ -247,6 +247,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT005` | error | `description` is not a string literal, or the options are not an object literal |
 | `AT006` | error | Unknown `@agent` modifier |
 | `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
+| `AT008` | error | The registry file lists a plain function by reference. Only an `agent()` tool can be listed without `tool(...)`. The check follows relative imports. |
 | `AT101` | warn | A schema cannot be converted to JSON Schema, so the tool is registered without `inputSchema`. For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
 | `AT102` | warn | `@agent` function without detectable runtime validation |
 | `AT103` | warn | Consequential tool with `confirm: 'never'` |
@@ -256,6 +257,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT107` | warn | Input schema with a personal field (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |
 | `AT108` | warn | Description shorter than 20 characters |
 | `AT109` | warn | An `agent()` call that is not the value of a top-level `const` or of the default export, so the analyzer cannot register it. List the function in `agent-tools.ts`, or wrap the handler and not the `agent()` call. |
+| `AT110` | warn | An exported `agent()` or `@agent` tool in a file that the `scan` globs do not cover, so the tool is not registered. Test files and the `dist`, `build`, and `coverage` folders are not checked. |
 | `AT201` | error | Next.js is missing or is not 16.x (`doctor`) |
 | `AT202` | error | React is missing or older than 19.2 (`doctor`) |
 | `AT203` | warn | A validator without Standard JSON Schema support is installed (`doctor`) |

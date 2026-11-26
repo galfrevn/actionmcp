@@ -59,7 +59,9 @@ Input: the `withAgentTools()` options. Output: the list of tools, the route tabl
 3. It reads the registry file (`agent-tools.ts`) statically to list its tools and check their literal options. A registry that it cannot read is an error, so that `inspect` always shows every tool.
 4. It scans `app/` to build the route table for the [navigate tool](#the-navigate-tool).
 
-An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
+An `agent()` tool that the registry file lists by reference is registered once, under the registry's name. The analyzer follows a relative import of the registry file to find that tool, including a tool in a file outside the `scan` globs. A reference to a plain function is the error `AT008`.
+
+The analyzer also lists the other source files of the project once per process, and reports `AT110` for an exported tool in a file that no `scan` glob covers. In watch mode it checks the same files again and does not list the project again.
 
 The analyzer registers an `agent()` call only when it is the value of a top-level `const` or of the default export. For any other `agent()` call, such as one inside a factory function or one wrapped in another call, it reports `AT109`.
 

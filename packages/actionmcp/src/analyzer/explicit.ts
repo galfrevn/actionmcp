@@ -8,7 +8,10 @@ import { propertyName, walk, type ParsedModule } from './source'
 
 export interface ToolReference {
   tool: AnalyzedTool
+  localName: string
   exportName: string
+  importSource?: string
+  offset: number
 }
 
 export interface RegistryScan {
@@ -64,8 +67,15 @@ function addTool(module: ParsedModule, scan: RegistryScan, imports: Map<string, 
       validated: true,
       diagnostics: [],
     }
+    const binding = importedBindings(module).get(value.name)
     scan.tools.push(tool)
-    scan.references.push({ tool, exportName: importedBindings(module).get(value.name) ?? value.name })
+    scan.references.push({
+      tool,
+      localName: value.name,
+      exportName: binding?.exportName ?? value.name,
+      offset: value.start,
+      ...(binding ? { importSource: binding.source } : {}),
+    })
     return
   }
   if (!isCallTo(value, imports, 'tool')) {
@@ -116,13 +126,21 @@ function importedNames(module: ParsedModule): Map<string, string> {
   return names
 }
 
-function importedBindings(module: ParsedModule): Map<string, string> {
-  const bindings = new Map<string, string>()
+interface ImportBinding {
+  exportName: string
+  source: string
+}
+
+function importedBindings(module: ParsedModule): Map<string, ImportBinding> {
+  const bindings = new Map<string, ImportBinding>()
   for (const statement of module.program.body) {
     if (statement.type !== 'ImportDeclaration') continue
+    const source = statement.source.value
     for (const specifier of statement.specifiers) {
-      if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
-        bindings.set(specifier.local.name, specifier.imported.name)
+      if (specifier.type === 'ImportDefaultSpecifier') {
+        bindings.set(specifier.local.name, { exportName: 'default', source })
+      } else if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
+        bindings.set(specifier.local.name, { exportName: specifier.imported.name, source })
       }
     }
   }

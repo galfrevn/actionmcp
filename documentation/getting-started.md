@@ -81,6 +81,8 @@ What `agent()` does:
 - It returns `{ ok: true, data }` or `{ ok: false, error }`. It does not throw for validation or handler errors.
 - It marks the tool as consequential unless you set `readOnly: true`.
 
+The analyzer looks for `agent()` in `app/`, `lib/`, and `src/`. For a file in another folder, add a glob to the `scan` option of `withAgentTools()`.
+
 The description must be a string literal. The build stops with `AT005` if it is not, because tool metadata must come from source code and never from data.
 
 Your UI can call the same function: `await addTodo({ text })`.

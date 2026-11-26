@@ -1,6 +1,6 @@
 import { compareText } from '../core/compare'
 import { readFileSync, statSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { join, posix, relative, sep } from 'node:path'
 import { glob } from 'tinyglobby'
 import { NAVIGATE_TOOL_NAME, describeNameIssue, isReservedToolName, isValidToolName, type NameIssue } from '../core/names'
 import { NAVIGATE_DESCRIPTION } from '../next/routes'
@@ -11,17 +11,22 @@ import { scanRegistryModule, type ToolReference } from './explicit'
 import type { AnalysisResult, AnalyzedTool } from './model'
 import { scanRoutes, type PageMetadataCache } from './routes'
 import { mayContainTools, scanModule, type ModuleScan } from './scan'
-import { parseModule } from './source'
+import { parseModule, type ParsedModule } from './source'
 import { inferParameterSchemas } from './types'
 
 export interface AnalysisCache {
   modules: Map<string, { stamp: string; scan: ModuleScan | undefined }>
   pages: PageMetadataCache
+  outside?: string[]
 }
 
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mts|mjs)$/
 const TYPES_CACHE_FILE = 'cache/types.json'
 const PACKAGE_MANIFEST = { file: 'package.json', line: 1, column: 1 }
+const PROJECT_SOURCES = '**/*.{ts,tsx,js,jsx,mts,mjs}'
+const IGNORED_SOURCES = ['**/node_modules/**', '**/.next/**', '**/*.d.ts']
+const IGNORED_OUTSIDE_SCAN = ['**/dist/**', '**/build/**', '**/coverage/**', '**/*.{test,spec}.*']
+const IMPORT_SUFFIXES = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '/index.ts', '/index.tsx', '/index.js', '/index.jsx']
 
 export function createAnalysisCache(): AnalysisCache {
   return { modules: new Map(), pages: new Map() }
@@ -30,21 +35,27 @@ export function createAnalysisCache(): AnalysisCache {
 export async function analyze(config: ResolvedConfig, cache: AnalysisCache = createAnalysisCache()): Promise<AnalysisResult> {
   const files = await listSourceFiles(config)
   const registryFile = config.registry ? toRelative(config.cwd, config.registry) : undefined
+  const scanned = new Set(files)
   const scans = files.filter((file) => file !== registryFile).flatMap((file) => scanFile(config, cache, file) ?? [])
-  const listed = new Set(files)
-  for (const file of cache.modules.keys()) {
-    if (!listed.has(file)) cache.modules.delete(file)
-  }
 
   const tools = scans.flatMap((scan) => scan.tools)
   const diagnostics = scans.flatMap((scan) => scan.diagnostics)
   resolveTypes(config, scans, diagnostics)
 
+  const adopted = new Set<string>()
   if (config.registry && registryFile) {
-    const registry = scanRegistryModule(parseModule(registryFile, readFileSync(config.registry, 'utf8')))
-    for (const reference of registry.references) adoptDiscoveredTool(tools, reference)
+    const module = parseModule(registryFile, readFileSync(config.registry, 'utf8'))
+    const registry = scanRegistryModule(module)
+    for (const reference of registry.references) {
+      diagnostics.push(...adoptReference(config, module, tools, reference, adopted))
+    }
     tools.push(...registry.tools)
     diagnostics.push(...registry.diagnostics)
+  }
+  diagnostics.push(...(await findToolsOutsideScan(config, cache, scanned, registryFile, adopted)))
+  const cached = new Set([...files, ...(cache.outside ?? [])])
+  for (const file of cache.modules.keys()) {
+    if (!cached.has(file)) cache.modules.delete(file)
   }
 
   const routes = scanRoutes(config.cwd, cache.pages)
@@ -64,7 +75,7 @@ async function listSourceFiles(config: ResolvedConfig): Promise<string[]> {
   const files = await glob(config.scan, {
     cwd: config.cwd,
     onlyFiles: true,
-    ignore: ['**/node_modules/**', '**/.next/**', `${outDir}/**`, '**/*.d.ts'],
+    ignore: [...IGNORED_SOURCES, `${outDir}/**`],
   })
   return files.filter((file) => SOURCE_FILE.test(file)).toSorted()
 }
@@ -105,13 +116,95 @@ function resolveTypes(config: ResolvedConfig, scans: readonly ModuleScan[], diag
   if (missingToolchain) diagnostics.push(createDiagnostic('AT206', PACKAGE_MANIFEST))
 }
 
-function adoptDiscoveredTool(tools: AnalyzedTool[], { tool, exportName }: ToolReference): void {
-  const matches = tools.filter((candidate) => candidate.kind === 'agent' && candidate.source.export === exportName)
+function adoptReference(
+  config: ResolvedConfig,
+  registry: ParsedModule,
+  tools: AnalyzedTool[],
+  reference: ToolReference,
+  adopted: Set<string>,
+): Diagnostic[] {
+  const { tool, exportName, importSource } = reference
+  const target = importSource === undefined ? undefined : resolveImport(config.cwd, registry.file, importSource)
+  const matches = tools.filter(
+    (candidate) =>
+      candidate.kind === 'agent' && candidate.source.export === exportName && (target === undefined || candidate.source.file === target),
+  )
+  if (matches.length > 1) return []
   const [discovered] = matches
-  if (!discovered || matches.length > 1) return
-  tools.splice(tools.indexOf(discovered), 1)
+  if (discovered) {
+    tools.splice(tools.indexOf(discovered), 1)
+    adoptTool(tool, discovered, adopted)
+    return []
+  }
+  if (target === undefined) return []
+  const scan = scanModule(parseModule(target, readFileSync(join(config.cwd, target), 'utf8')), config)
+  const outside = scan.tools.find((candidate) => candidate.kind === 'agent' && candidate.source.export === exportName)
+  if (outside) {
+    const related = scan.diagnostics.filter((diagnostic) => diagnostic.tool !== undefined && diagnostic.tool === outside.name)
+    adoptTool(tool, outside, adopted)
+    return related
+  }
+  if (!scan.plainFunctions.includes(exportName)) return []
+  tool.diagnostics.push('AT008')
+  const detail = `"${reference.localName}" is a plain function in ${target}`
+  return [createDiagnostic('AT008', registry.locate(reference.offset), detail, tool.name)]
+}
+
+function adoptTool(tool: AnalyzedTool, discovered: AnalyzedTool, adopted: Set<string>): void {
   const { name, kind } = tool
   Object.assign(tool, discovered, { name, kind })
+  adopted.add(toolKey(discovered.source.file, discovered.source.export))
+}
+
+function toolKey(file: string, exportName: string): string {
+  return `${file}#${exportName}`
+}
+
+function resolveImport(cwd: string, fromFile: string, specifier: string): string | undefined {
+  if (!specifier.startsWith('.')) return undefined
+  const base = posix.join(posix.dirname(fromFile), specifier)
+  if (base.startsWith('..')) return undefined
+  return IMPORT_SUFFIXES.map((suffix) => `${base}${suffix}`).find((candidate) => isFile(join(cwd, candidate)))
+}
+
+function isFile(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false
+}
+
+async function findToolsOutsideScan(
+  config: ResolvedConfig,
+  cache: AnalysisCache,
+  scanned: ReadonlySet<string>,
+  registryFile: string | undefined,
+  adopted: ReadonlySet<string>,
+): Promise<Diagnostic[]> {
+  cache.outside ??= await listOutsideCandidates(config, scanned, registryFile)
+  const diagnostics: Diagnostic[] = []
+  for (const file of cache.outside) {
+    if (scanned.has(file) || !isFile(join(config.cwd, file))) continue
+    for (const tool of scanFile(config, cache, file)?.tools ?? []) {
+      const isServerFunction = tool.source.export !== '' && !tool.diagnostics.includes('AT004')
+      if (!isServerFunction || adopted.has(toolKey(file, tool.source.export))) continue
+      diagnostics.push(createDiagnostic('AT110', { file, line: tool.source.line, column: 1 }, `"${tool.name}"`, tool.name))
+    }
+  }
+  return diagnostics
+}
+
+async function listOutsideCandidates(
+  config: ResolvedConfig,
+  scanned: ReadonlySet<string>,
+  registryFile: string | undefined,
+): Promise<string[]> {
+  const outDir = toRelative(config.cwd, config.outDir)
+  const files = await glob(PROJECT_SOURCES, {
+    cwd: config.cwd,
+    onlyFiles: true,
+    ignore: [...IGNORED_SOURCES, ...IGNORED_OUTSIDE_SCAN, `${outDir}/**`],
+  })
+  return files
+    .filter((file) => !scanned.has(file) && file !== registryFile && mayContainTools(readFileSync(join(config.cwd, file), 'utf8')))
+    .toSorted()
 }
 
 function navigateTool(): AnalyzedTool {
