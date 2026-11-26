@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "no-console": "off",
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": "off",
+    "unicorn/consistent-function-scoping": "off"
+  },
+  "ignorePatterns": ["**/dist/**", "**/.next/**", "**/.agent-tools/**", "**/coverage/**", "**/next-env.d.ts", "**/__fixtures__/**"],
+  "overrides": [
+    {
+      "files": ["packages/actionmcp/src/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["next", "next/*", "react-dom/server", "**/next/*", "**/react/*", "**/server/*"],
+                "message": "src/core must stay framework-agnostic (ADR-008)."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
