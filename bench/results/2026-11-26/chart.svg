@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" font-family="system-ui, sans-serif" font-size="11">
+<title>Median tokens per task, with p10 to p90 whiskers</title>
+<rect width="720" height="360" fill="#fff"/>
+<line x1="72" x2="72" y1="24" y2="304" stroke="#111"/>
+<line x1="72" x2="704" y1="304" y2="304" stroke="#111"/>
+<text x="64" y="28" text-anchor="end">355,597</text>
+<text x="64" y="304" text-anchor="end">0</text>
+<text x="16" y="164" transform="rotate(-90 16 164)" text-anchor="middle">Tokens per run</text>
+<rect x="91.0" y="280.5" width="40.2" height="23.5" fill="#8a8f98"><title>invite-member clicks: 29,903 tokens</title></rect><line x1="113.1" x2="113.1" y1="280.5" y2="280.4" stroke="#111" stroke-width="1.5"/>
+<rect x="135.2" y="297.7" width="40.2" height="6.3" fill="#2f6feb"><title>invite-member webmcp: 8,004 tokens</title></rect><line x1="157.3" x2="157.3" y1="297.7" y2="297.7" stroke="#111" stroke-width="1.5"/>
+<rect x="217.4" y="289.6" width="40.2" height="14.4" fill="#8a8f98"><title>rename-account clicks: 18,339 tokens</title></rect><line x1="239.5" x2="239.5" y1="296.7" y2="289.1" stroke="#111" stroke-width="1.5"/>
+<rect x="261.6" y="297.7" width="40.2" height="6.3" fill="#2f6feb"><title>rename-account webmcp: 7,973 tokens</title></rect><line x1="283.7" x2="283.7" y1="297.8" y2="297.7" stroke="#111" stroke-width="1.5"/>
+<rect x="343.8" y="290.6" width="40.2" height="13.4" fill="#8a8f98"><title>remove-member clicks: 17,003 tokens</title></rect><line x1="365.9" x2="365.9" y1="290.6" y2="290.6" stroke="#111" stroke-width="1.5"/>
+<rect x="388.0" y="292.8" width="40.2" height="11.2" fill="#2f6feb"><title>remove-member webmcp: 14,202 tokens</title></rect><line x1="410.1" x2="410.1" y1="292.9" y2="292.8" stroke="#111" stroke-width="1.5"/>
+<rect x="470.2" y="299.1" width="40.2" height="4.9" fill="#8a8f98"><title>list-owners clicks: 6,273 tokens</title></rect><line x1="492.3" x2="492.3" y1="299.1" y2="299.1" stroke="#111" stroke-width="1.5"/>
+<rect x="514.4" y="296.8" width="40.2" height="7.2" fill="#2f6feb"><title>list-owners webmcp: 9,201 tokens</title></rect><line x1="536.5" x2="536.5" y1="296.8" y2="296.7" stroke="#111" stroke-width="1.5"/>
+<rect x="596.6" y="156.2" width="40.2" height="147.8" fill="#8a8f98"><title>composite clicks: 187,717 tokens</title></rect><line x1="618.7" x2="618.7" y1="241.2" y2="24.0" stroke="#111" stroke-width="1.5"/>
+<rect x="640.8" y="291.1" width="40.2" height="12.9" fill="#2f6feb"><title>composite webmcp: 16,355 tokens</title></rect><line x1="662.9" x2="662.9" y1="291.3" y2="288.7" stroke="#111" stroke-width="1.5"/>
+<text x="135.2" y="328" text-anchor="middle">invite-member</text>
+<text x="261.6" y="328" text-anchor="middle">rename-account</text>
+<text x="388.0" y="328" text-anchor="middle">remove-member</text>
+<text x="514.4" y="328" text-anchor="middle">list-owners</text>
+<text x="640.8" y="328" text-anchor="middle">composite</text>
+<rect x="72" y="342" width="10" height="10" fill="#8a8f98"/><text x="88" y="351">clicks</text>
+<rect x="182" y="342" width="10" height="10" fill="#2f6feb"/><text x="198" y="351">webmcp</text>
+</svg>
