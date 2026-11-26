@@ -15,7 +15,9 @@ export interface RegisterToolsOptions {
 }
 
 const MAX_NAME_ATTEMPTS = 3
+export const AVAILABILITY_CHECK_DELAYS_MS: readonly number[] = [250, 1000, 4000]
 const availabilityListeners = new Set<() => void>()
+let availabilityCheck: ReturnType<typeof setTimeout> | undefined
 let pendingPolyfill: Promise<ModelContext | undefined> | undefined
 
 export function getModelContext(): ModelContext | undefined {
@@ -33,27 +35,52 @@ export function getWebMCPStatus(): WebMCPStatus {
 export function loadPolyfill(): Promise<ModelContext | undefined> {
   pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(({ installWebMCP }) => {
     installWebMCP()
-    for (const listener of availabilityListeners) listener()
-    availabilityListeners.clear()
+    announceAvailability()
     return getModelContext()
   })
   return pendingPolyfill
+}
+
+function announceAvailability(): void {
+  clearTimeout(availabilityCheck)
+  availabilityCheck = undefined
+  for (const listener of availabilityListeners) listener()
+  availabilityListeners.clear()
+}
+
+function scheduleAvailabilityCheck(attempt: number): void {
+  const delay = AVAILABILITY_CHECK_DELAYS_MS[attempt]
+  if (availabilityCheck !== undefined || delay === undefined) return
+  availabilityCheck = setTimeout(() => {
+    availabilityCheck = undefined
+    if (getModelContext()) announceAvailability()
+    else scheduleAvailabilityCheck(attempt + 1)
+  }, delay)
 }
 
 export function whenModelContextAvailable(signal: AbortSignal): Promise<ModelContext | undefined> {
   const context = getModelContext()
   if (context) return Promise.resolve(context)
   return new Promise((resolve) => {
-    const listener = () => resolve(getModelContext())
+    const onAbort = () => {
+      availabilityListeners.delete(listener)
+      if (availabilityListeners.size === 0) {
+        clearTimeout(availabilityCheck)
+        availabilityCheck = undefined
+      }
+      resolve(undefined)
+    }
+    const listener = () => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(getModelContext())
+    }
+    if (signal.aborted) {
+      resolve(undefined)
+      return
+    }
     availabilityListeners.add(listener)
-    signal.addEventListener(
-      'abort',
-      () => {
-        availabilityListeners.delete(listener)
-        resolve(undefined)
-      },
-      { once: true },
-    )
+    signal.addEventListener('abort', onAbort, { once: true })
+    scheduleAvailabilityCheck(0)
   })
 }
 

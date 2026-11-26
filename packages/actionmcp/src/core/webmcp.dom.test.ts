@@ -1,5 +1,6 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  AVAILABILITY_CHECK_DELAYS_MS,
   getModelContext,
   getWebMCPStatus,
   loadPolyfill,
@@ -29,6 +30,64 @@ describe('without WebMCP', () => {
     const pending = whenModelContextAvailable(controller.signal)
     controller.abort()
     await expect(pending).resolves.toBeUndefined()
+  })
+
+  describe('a context that is installed after the page loads', () => {
+    const lateContext = { registerTool: async () => {} } as unknown as ModelContext
+    const totalDelay = AVAILABILITY_CHECK_DELAYS_MS.reduce((total, delay) => total + delay, 0)
+
+    afterEach(() => {
+      vi.useRealTimers()
+      Reflect.deleteProperty(document, 'modelContext')
+    })
+
+    it('resolves waiting callers at the next check', async () => {
+      vi.useFakeTimers()
+      const first = whenModelContextAvailable(new AbortController().signal)
+      const second = resolveModelContext(false, new AbortController().signal)
+      await vi.advanceTimersByTimeAsync(AVAILABILITY_CHECK_DELAYS_MS[0] ?? 0)
+      Object.defineProperty(document, 'modelContext', { value: lateContext, configurable: true })
+      expect(vi.getTimerCount()).toBe(1)
+      await vi.advanceTimersByTimeAsync(AVAILABILITY_CHECK_DELAYS_MS[1] ?? 0)
+      await expect(first).resolves.toBe(lateContext)
+      await expect(second).resolves.toBe(lateContext)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('stops checking after the last delay and checks again for a later caller', async () => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      const early = whenModelContextAvailable(controller.signal)
+      await vi.advanceTimersByTimeAsync(totalDelay)
+      expect(vi.getTimerCount()).toBe(0)
+      Object.defineProperty(document, 'modelContext', { value: lateContext, configurable: true })
+      await vi.advanceTimersByTimeAsync(totalDelay)
+      controller.abort()
+      await expect(early).resolves.toBeUndefined()
+
+      Reflect.deleteProperty(document, 'modelContext')
+      const later = whenModelContextAvailable(new AbortController().signal)
+      expect(vi.getTimerCount()).toBe(1)
+      Object.defineProperty(document, 'modelContext', { value: lateContext, configurable: true })
+      await vi.advanceTimersByTimeAsync(AVAILABILITY_CHECK_DELAYS_MS[0] ?? 0)
+      await expect(later).resolves.toBe(lateContext)
+    })
+
+    it('stops checking when every caller has aborted', async () => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      const pending = whenModelContextAvailable(controller.signal)
+      expect(vi.getTimerCount()).toBe(1)
+      controller.abort()
+      await expect(pending).resolves.toBeUndefined()
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('does not wait for a signal that is already aborted', async () => {
+      vi.useFakeTimers()
+      await expect(whenModelContextAvailable(AbortSignal.abort())).resolves.toBeUndefined()
+      expect(vi.getTimerCount()).toBe(0)
+    })
   })
 
   it('resolves waiting callers once the polyfill is installed', async () => {
