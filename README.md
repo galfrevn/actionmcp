@@ -130,6 +130,7 @@ The `polyfill` option of `<AgentTools />` loads [`@w3c/webmcp-polyfill`](https:/
 | [`examples/safe-action`](examples/safe-action) | A next-safe-action action with `fromSafeAction()` |
 | [`examples/jsdoc`](examples/jsdoc) | The experimental `@agent` tag |
 | [`examples/chat`](examples/chat) | An in-app assistant with the AI SDK WebMCP transport |
+| [`examples/demo`](examples/demo) | The chat example prepared for a public deployment, with a list per visitor and limits on the model |
 
 ```bash
 pnpm install

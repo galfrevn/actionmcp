@@ -1,0 +1,141 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 6rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+input,
+select,
+button,
+textarea {
+  padding: 0.375rem 0.625rem;
+  font: inherit;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.muted {
+  opacity: 0.7;
+}
+
+.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.session {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.layout {
+  display: grid;
+  gap: 2rem;
+}
+
+.chat {
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 0.75rem;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 6rem;
+}
+
+.message {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.tool {
+  font:
+    0.8125rem/1.4 ui-monospace,
+    monospace;
+  opacity: 0.75;
+}
+
+a {
+  color: inherit;
+}
+
+nav {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+ol {
+  padding-left: 1.25rem;
+}
+
+ol li {
+  display: list-item;
+  padding: 0.25rem 0;
+  border-bottom: none;
+}
+
+code {
+  font:
+    0.875em/1.4 ui-monospace,
+    monospace;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.375rem 0.5rem 0.375rem 0;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+[role='alert'] {
+  margin: 0.5rem 0;
+  color: light-dark(#b42318, #fda29b);
+}
+
+footer {
+  margin-top: 3rem;
+  font-size: 0.875rem;
+}
