@@ -1,5 +1,5 @@
 export { AgentToolsProvider, type AgentToolsProviderProps } from './react/Provider'
 export { AgentToolsDevtools } from './react/Devtools'
 export { ConfirmDialog } from './react/Confirm'
-export type { AgentToolsHooks, ConfirmProps } from './react/context'
+export type { AgentToolsHooks, ConfirmLabels, ConfirmProps } from './react/context'
 export type { ToolAnnotations, ToolCall } from './core/types'

@@ -138,6 +138,7 @@ A Client Component that configures the tools registered below it.
 | `onBeforeExecute` | `(call) => boolean \| Promise<boolean>` | Runs after the confirmation. `false` blocks the call. |
 | `onAfterExecute` | `(call, result) => void` | Runs after the action, with the result that the agent receives. |
 | `confirmComponent` | `ComponentType<ConfirmProps>` | Replaces the default dialog. Call `onConfirm` or `onCancel` exactly once. |
+| `confirmLabels` | `Partial<ConfirmLabels>` | Replaces the text of the default dialog. A label that you leave out keeps its English default. |
 
 `call` is `{ name, input, annotations, source: 'agent' }`.
 
@@ -148,6 +149,26 @@ A floating panel that renders only when `NODE_ENV` is `development`. It shows wh
 ### `ConfirmDialog`
 
 The default confirmation component, exported so that a custom one can wrap it.
+
+The dialog shows the title, the tool description, and one row for each field of the input. The label of a row is the `title` of that property in the input schema, or the field name. With Zod, set it with `z.string().meta({ title: 'Email address' })`.
+
+`ConfirmLabels` holds the text of the dialog:
+
+| Label | Default |
+|---|---|
+| `title` | `Allow “{tool}”?`. `{tool}` is replaced with the tool title, or with the tool name. |
+| `intro` | `An agent wants to run this action.` |
+| `input` | `Action input`, the accessible name of the input list. |
+| `allow` | `Allow` |
+| `cancel` | `Cancel` |
+
+```tsx
+<AgentToolsProvider confirmLabels={{ title: '¿Permitir «{tool}»?', allow: 'Permitir', cancel: 'Cancelar' }}>
+  {children}
+</AgentToolsProvider>
+```
+
+The labels are plain strings, so a Server Component can pass translated text.
 
 ## `actionmcp/config`
 

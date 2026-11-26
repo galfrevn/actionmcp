@@ -170,7 +170,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 
 `src/core/execute.ts` runs these steps for each call:
 
-1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
+1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. The default dialog lists each field of the input with its value. The label of a field is the `title` of its property in the input schema, or the field name. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
 2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`.
 3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.

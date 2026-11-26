@@ -59,6 +59,10 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 ```
 
+## Can I translate the confirmation dialog?
+
+Yes. Pass `confirmLabels` to `AgentToolsProvider`. The [API reference](api-reference.md#confirmdialog) lists the labels. To name the input fields, set a `title` on each property of the input schema.
+
 ## Why does my `agent()` wrapper produce no tool?
 
 The analyzer registers an `agent()` call only when it is the value of an exported top-level `const` or of the default export. A call inside a factory function, or wrapped in another call, produces the `AT109` warning and no tool. Wrap the handler and keep `agent()` at the top level, or list the function that your factory returns in `agent-tools.ts`.
