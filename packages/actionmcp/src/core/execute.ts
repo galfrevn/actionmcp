@@ -13,7 +13,9 @@ export interface ToolRuntime {
 export type ToolOutput = AgentResult<unknown>
 
 export function requiresConfirmation(tool: Pick<SerializableToolDef, 'confirm' | 'annotations'>): boolean {
-  return tool.confirm === 'always' || (tool.confirm === 'consequential' && tool.annotations.consequentialHint)
+  if (tool.confirm === 'never') return false
+  if (tool.confirm === 'consequential') return tool.annotations.consequentialHint !== false
+  return true
 }
 
 export async function executeTool(

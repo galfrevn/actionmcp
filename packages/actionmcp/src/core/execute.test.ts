@@ -35,6 +35,15 @@ describe('requiresConfirmation', () => {
   ])('confirm=%s with %j requires confirmation: %s', (confirm, annotations, expected) => {
     expect(requiresConfirmation({ confirm, annotations })).toBe(expected)
   })
+
+  it.each(['Always', 'sometimes', '', undefined])('asks for confirmation when the policy is the unknown value %j', (confirm) => {
+    expect(requiresConfirmation({ confirm: confirm as never, annotations: readOnly })).toBe(true)
+    expect(requiresConfirmation({ confirm: confirm as never, annotations: consequential })).toBe(true)
+  })
+
+  it('asks for confirmation when the consequential hint is missing', () => {
+    expect(requiresConfirmation({ confirm: 'consequential', annotations: { readOnlyHint: false } as never })).toBe(true)
+  })
 })
 
 describe('executeTool', () => {

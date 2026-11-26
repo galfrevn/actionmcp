@@ -18,6 +18,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 ### Fixed
 
 - An error in `onAfterExecute`, or in a listener of the devtools panel, no longer rejects a tool call whose action already ran.
+- A tool whose `confirm` option is not `'always'`, `'consequential'`, or `'never'` asks for confirmation. Before, it ran without one.
 
 ## 0.2.0
 
