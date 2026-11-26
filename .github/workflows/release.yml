@@ -77,11 +77,9 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org
       - run: pnpm build
-      - name: Publish with provenance
+      - name: Publish with trusted publishing
         run: npm publish --provenance --access public --tag ${{ needs.verify.outputs.dist-tag }}
         working-directory: packages/actionmcp
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create the GitHub release
         run: |
           TAG="v${{ needs.verify.outputs.version }}"
