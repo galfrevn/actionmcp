@@ -169,6 +169,52 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
 
+  examples/demo:
+    dependencies:
+      '@ai-sdk/mcp':
+        specifier: ^2.0.0
+        version: 2.0.104(zod@4.6.7)
+      '@ai-sdk/react':
+        specifier: ^4.0.0
+        version: 4.0.186(react@19.3.1)(zod@4.6.7)
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.2.0
+        version: 0.2.0
+      actionmcp:
+        specifier: workspace:*
+        version: link:../../packages/actionmcp
+      ai:
+        specifier: ^7.0.0
+        version: 7.0.181(zod@4.6.7)
+      next:
+        specifier: 16.4.6
+        version: 16.4.6(@playwright/test@1.65.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.3.1
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.3.0(@types/react@19.3.1)
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      webmcp-types:
+        specifier: ^0.2.0
+        version: 0.2.0
+
   examples/formdata:
     dependencies:
       actionmcp:

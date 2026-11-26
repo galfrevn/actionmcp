@@ -6,7 +6,7 @@ export interface FixtureServer {
 }
 
 const FIXTURES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'scoped', 'navigate', 'redirect', 'hostile', 'coexist'] as const
-const EXAMPLES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'chat'] as const
+const EXAMPLES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'chat', 'demo'] as const
 
 export type FixtureName = (typeof FIXTURES)[number] | 'basic-dev'
 export type ExampleName = (typeof EXAMPLES)[number]

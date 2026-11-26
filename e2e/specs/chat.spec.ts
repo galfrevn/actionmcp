@@ -1,56 +1,10 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+import { lastToolOutput, mockModel, reply, toolCall } from '../support/chat'
 import { exampleUrl } from '../support/fixtures'
 import { allow, cancel, confirmDialog, expectTools } from '../support/webmcp'
 
 const url = exampleUrl('chat')
 const TOOLS = ['addTodo', 'listTodos', 'removeTodo', 'toggleTodo']
-
-type StreamChunk = Record<string, unknown>
-
-interface ChatRequest {
-  messages: Array<{ role: string; parts: Array<Record<string, unknown>> }>
-  tools: Array<{ name: string; description?: string; inputSchema?: unknown; annotations?: Record<string, boolean> }>
-}
-
-function streamBody(chunks: StreamChunk[]): string {
-  return `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`
-}
-
-function toolCall(toolName: string, input: Record<string, unknown>): StreamChunk[] {
-  return [
-    { type: 'start', messageId: `message-${toolName}` },
-    { type: 'start-step' },
-    { type: 'tool-input-available', toolCallId: `call-${toolName}`, toolName, input, dynamic: true },
-    { type: 'finish-step' },
-    { type: 'finish' },
-  ]
-}
-
-function reply(text: string): StreamChunk[] {
-  return [
-    { type: 'start', messageId: 'message-reply' },
-    { type: 'start-step' },
-    { type: 'text-start', id: 'text-1' },
-    { type: 'text-delta', id: 'text-1', delta: text },
-    { type: 'text-end', id: 'text-1' },
-    { type: 'finish-step' },
-    { type: 'finish' },
-  ]
-}
-
-async function mockModel(page: Page, turns: StreamChunk[][]): Promise<ChatRequest[]> {
-  const requests: ChatRequest[] = []
-  await page.route('**/api/chat', async (route: Route) => {
-    requests.push(route.request().postDataJSON() as ChatRequest)
-    const chunks = turns[requests.length - 1] ?? reply('Done.')
-    await route.fulfill({
-      status: 200,
-      headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
-      body: streamBody(chunks),
-    })
-  })
-  return requests
-}
 
 async function open(page: Page): Promise<void> {
   await page.goto(url)
@@ -58,11 +12,6 @@ async function open(page: Page): Promise<void> {
   if (await signIn.isVisible()) await signIn.click()
   await expectTools(page, TOOLS)
   await expect(page.getByRole('button', { name: 'Send' })).toBeEnabled()
-}
-
-function lastToolOutput(request: ChatRequest | undefined): unknown {
-  const parts = request?.messages.flatMap((message) => message.parts) ?? []
-  return parts.findLast((part) => part.type === 'dynamic-tool')?.output
 }
 
 test.describe('chat example: in-app assistant over the WebMCP transport', () => {
@@ -108,7 +57,7 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
     expect(response.status()).toBe(401)
   })
 
-  test('the route accepts reasoning parts from the model and rejects attachments', async ({ page }) => {
+  test('the route accepts reasoning and provider parts from the model and rejects attachments', async ({ page }) => {
     await open(page)
     const tools = [{ name: 'listTodos', description: 'List the todos.', inputSchema: { type: 'object' } }]
     const user = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'What is on my list?' }] }
@@ -134,6 +83,8 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
       output: { content: [{ type: 'text', text: '{"ok":true,"data":[]}' }] },
     }
     expect(await post([{ type: 'step-start' }, { type: 'reasoning', text: 'Read the list first.', state: 'done' }, toolResult])).toBe(200)
+    const providerPart = { type: 'custom', kind: 'anthropic.message_start', providerMetadata: { anthropic: { id: 'msg_1' } } }
+    expect(await post([{ type: 'step-start' }, providerPart, toolResult])).toBe(200)
     expect(await post([{ type: 'file', mediaType: 'image/png', url: 'https://example.com/a.png' }])).toBe(400)
   })
 
