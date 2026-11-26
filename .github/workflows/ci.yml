@@ -24,7 +24,7 @@ jobs:
       matrix:
         node: ['22', '24']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
           node-version: ${{ matrix.node }}
@@ -45,7 +45,7 @@ jobs:
           - next: '16.2.12'
             react: '19.2.9'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Pin the framework versions of the fixtures
         if: matrix.next != '16.4.6'
@@ -57,7 +57,7 @@ jobs:
     name: End-to-end (polyfill and native WebMCP)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm build
       - run: pnpm build:fixtures
@@ -65,7 +65,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - run: pnpm test:e2e:native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-traces
@@ -76,7 +76,7 @@ jobs:
     name: Packed tarball in an npm project
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm build
       - run: pnpm test:package
