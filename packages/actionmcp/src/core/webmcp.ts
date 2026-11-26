@@ -1,4 +1,5 @@
 import type { WebMCP } from 'webmcp-types'
+import { isValidToolName } from './names'
 
 export type ModelContext = WebMCP.ModelContext & {
   waitForToolsUntil?: (promise: Promise<unknown>) => void
@@ -102,20 +103,25 @@ export function registerTools(
   return registrations
 }
 
+function suffixedName(name: string, attempt: number): string {
+  return attempt === 1 ? name : `${name}_${attempt}`
+}
+
 async function registerTool(
   context: ModelContext,
   tool: ModelContextTool,
   options: RegisterToolsOptions,
   attempt: number,
 ): Promise<string> {
-  const name = attempt === 1 ? tool.name : `${tool.name}_${attempt}`
+  const name = suffixedName(tool.name, attempt)
   const registerOptions: WebMCP.ModelContextRegisterToolOptions = { signal: options.signal }
   if (options.exposedTo) registerOptions.exposedTo = [...options.exposedTo]
   try {
     await context.registerTool({ ...tool, name }, registerOptions)
   } catch (error) {
     const collided = error instanceof DOMException && error.name === 'InvalidStateError'
-    if (!collided || options.signal.aborted || attempt >= MAX_NAME_ATTEMPTS) throw error
+    const canRetry = attempt < MAX_NAME_ATTEMPTS && isValidToolName(suffixedName(tool.name, attempt + 1))
+    if (!collided || options.signal.aborted || !canRetry) throw error
     return registerTool(context, tool, options, attempt + 1)
   }
   if (attempt > 1) options.onCollision?.(tool.name, name)

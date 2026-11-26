@@ -162,11 +162,26 @@ describe('with the polyfill', () => {
     controller.abort()
   })
 
-  it('reports a tool that cannot be registered', async () => {
+  it('reports a tool that cannot be registered without retrying under another invalid name', async () => {
     const controller = new AbortController()
+    const registerTool = vi.spyOn(context, 'registerTool')
     const results = await registerTools(context, [createTool('bad name')], { signal: controller.signal })
     expect(results[0]?.status).toBe('rejected')
+    expect(registerTool).toHaveBeenCalledOnce()
     expect(await toolNames(context)).toEqual([])
+    registerTool.mockRestore()
+  })
+
+  it('does not retry a taken name when the suffix would make it too long', async () => {
+    const controller = new AbortController()
+    const name = 'n'.repeat(127)
+    await registerTools(context, [createTool(name)], { signal: controller.signal })
+    const registerTool = vi.spyOn(context, 'registerTool')
+    const results = await registerTools(context, [createTool(name)], { signal: controller.signal })
+    expect(results[0]?.status).toBe('rejected')
+    expect(registerTool).toHaveBeenCalledOnce()
+    registerTool.mockRestore()
+    controller.abort()
   })
 
   it('passes exposedTo to the registration', async () => {

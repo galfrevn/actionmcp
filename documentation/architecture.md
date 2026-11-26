@@ -169,7 +169,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 - If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`.
 - If `document.modelContext` is missing and `polyfill` is not set, it checks again 250 ms, 1 s, and 4 s later, for a context that a browser extension installs after the page loads. After the last check it registers nothing.
 - It calls `waitForToolsUntil` when the browser has it.
-- If a name is already taken, the tool is registered with a `_2` suffix and a warning is logged in development.
+- If a name is already taken, the tool is registered with a `_2` suffix, then `_3`, and a warning is logged in development. The browser reports a taken name, an invalid name, and an inactive document with the same `InvalidStateError`, so the Registrar retries only while the suffixed name is valid.
 
 ### Executing a tool
 
