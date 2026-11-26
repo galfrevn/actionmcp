@@ -1,13 +1,12 @@
 # Contributing
 
-actionmcp v0.1 is implemented in this repository and is not published to npm yet. Contributions to the code, the tests, and the design are welcome.
+Contributions to the code, the tests, and the documentation are welcome.
 
-## Ways to help now
+## Ways to help
 
 - **Report a bug or propose a feature.** Use the issue forms. For a bug, include the output of `npx actionmcp doctor`.
-- **Run an open spike.** SP6 (ChatGPT Desktop) and the origin trial part of SP7 need a person and are open. The checklist for SP6 is in [`e2e/manual/chatgpt.md`](e2e/manual/chatgpt.md). Record each result under [Spike results](documentation/roadmap.md#spike-results) in the format shown there.
+- **Test with a real agent.** The checklist in [`e2e/manual/chatgpt.md`](e2e/manual/chatgpt.md) covers discovery, confirmation, and navigation. Open an issue with what you find.
 - **Run the benchmark.** The harness is in [`bench/`](bench/README.md). It needs a model key. Follow the publishing rules in that README.
-- **Propose a decision change.** Edit the matching record in [`documentation/decisions.md`](documentation/decisions.md). Until the first release, records are updated in place. Explain the trade-off.
 
 Open an issue before you start non-trivial work. In the pull request, link the issue and say what changes and why.
 
@@ -41,14 +40,14 @@ The test levels and fixtures are in [testing.md](documentation/testing.md).
 ### Code conventions
 
 - TypeScript, strict mode, ES modules.
-- No comments in source files. Names, types, and tests carry the intent. A decision that needs an explanation goes in `documentation/decisions.md`.
-- `src/core` does not import `next/*`, `react`, or the other layers ([ADR-008](documentation/decisions.md#adr-008-framework-agnostic-core-one-package-in-v01)).
+- No comments in source files. Names, types, and tests carry the intent. A decision that needs an explanation goes in the "Design decisions" section of `documentation/architecture.md`.
+- `src/core` does not import `next/*`, `react`, or the other layers.
 - Every change comes with tests. A new diagnostic code needs one positive and one negative test.
 - A change to the generated registry updates the snapshots in `tests/integration/__snapshots__` on purpose: run `pnpm test:integration -u` and review the diff.
 
 ## Security-sensitive changes
 
-A change to exposure, confirmation, execution, or schema handling must include the security tests described in [security.md](documentation/security.md). Name the threat (T1 to T12) that the test covers in the pull request description.
+A change to exposure, confirmation, execution, or schema handling must include security tests. Name the threat from the [threat model](documentation/security.md#threat-model) that the test covers in the pull request description.
 
 ## Coding agents
 
@@ -64,7 +63,7 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 
 ## Writing documentation
 
-This guide applies to every Markdown file in this repository: the README, the files in `documentation/`, ADRs, rule docs, issue templates, and release notes. Reviewers can reject a change that breaks it.
+This guide applies to every Markdown file in this repository: the README, the files in `documentation/`, issue templates, and release notes. Reviewers can reject a change that breaks it.
 
 The goal is documentation an engineer can trust and skim. Every sentence should either state a fact, give an instruction, or explain a decision.
 
@@ -72,9 +71,8 @@ The goal is documentation an engineer can trust and skim. Every sentence should 
 
 #### Say what is true, and only that
 
-- Describe what exists in the present tense. Describe what does not exist yet as planned, and label it: "Planned for v0.2".
+- Describe what exists, in the present tense. Do not document plans, phases, or the history of how something was built.
 - Do not state performance numbers, adoption numbers, or compatibility claims without a source or a benchmark in this repository. Link to it.
-- Mark facts by how well they are checked: **Verified** (checked against the primary source, with date), **Secondary source** (reported by a third party), or **Unverified** (needs checking; say what to check).
 - If you do not know something, write that you do not know it and what would settle it.
 
 #### Lead with the point
@@ -131,51 +129,15 @@ These words usually signal filler or marketing. Replace them with the concrete c
 ### Checklist before you open a pull request
 
 - [ ] Every claim about speed, size, adoption, or compatibility has a source or a benchmark link.
-- [ ] Planned features are labeled as planned.
+- [ ] The text describes what exists, not what is planned.
 - [ ] No word from the table above appears, unless it is quoted from a source.
 - [ ] Relative links and anchors resolve.
 - [ ] Code blocks declare a language and run as written.
 
 ## Reporting a vulnerability
 
-### Supported versions
-
-No version is released yet, so no version is supported. After the first release, the planned policy is to support the latest minor version.
-
-### How to report
-
-Report vulnerabilities privately through GitHub private vulnerability reporting: https://github.com/galfrevn/actionmcp/security/advisories/new
-
-Do not open a public issue, pull request, or discussion for a vulnerability.
-
-Include the following in your report:
-
-- The actionmcp version or commit, and the Next.js, browser, or agent versions you used.
-- Steps to reproduce, with a minimal app or code sample if you can provide one.
-- The expected result and the actual result.
-- The threat from the [threat model](documentation/security.md) that the issue maps to (T1 to T12), if you know it.
-
-The maintainer aims to acknowledge reports within 7 days.
-
-### Scope
-
-In scope, with examples from the [threat model](documentation/security.md):
-
-- A tool exposed without opt-in, such as a Server Function that becomes a tool without `agent()`, `tool()`, or `@agent` (T7).
-- Bypassing the confirmation dialog, so a consequential tool runs without a human click (T2).
-- Execution outside the native Server Function RPC, such as a new endpoint that runs actions (T4 and the non-negotiable defaults).
-- Privilege escalation beyond the user's session (T4).
-- Injection through tool metadata, such as a description or schema built from untrusted data (T11).
-
-Out of scope:
-
-- Vulnerabilities in browsers, agents, or Next.js itself. Report them to those projects.
-- Missing authorization or ownership checks inside your own action. The action owns those checks (T5).
+Report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## Code of conduct
 
-This project adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) by reference. Read that page for the full text, the standards, and the enforcement guidelines.
-
-### Reporting
-
-Contact the maintainer, @galfrevn. A private contact address will be added before the first release.
+Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).

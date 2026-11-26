@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-No version is released yet, so no version is supported. After the first release, the planned policy is to support the latest minor version.
+The latest minor version receives security fixes.
 
 ## How to report
 

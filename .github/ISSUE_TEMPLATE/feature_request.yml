@@ -21,7 +21,7 @@ body:
     attributes:
       label: Affected documents
       description: Name the file and the section in `documentation/` that the change touches.
-      placeholder: documentation/spec.md, Public API
+      placeholder: documentation/api-reference.md, AgentTools
   - type: textarea
     id: trade-offs
     attributes:
