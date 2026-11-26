@@ -20,8 +20,9 @@ npm install actionmcp
 
 `withAgentTools()` scans the project, writes the tool registry to `.agent-tools/`, and points `<AgentTools />` at it. It runs once during `next build` and watches for changes during `next dev`.
 
+`next.config.ts`:
+
 ```ts
-// next.config.ts
 import { withAgentTools } from 'actionmcp/config'
 import type { NextConfig } from 'next'
 
@@ -40,8 +41,9 @@ Add the output folder to `.gitignore`:
 
 Nothing is exposed until you opt in. Wrap the function in `agent()`, in a file that starts with `'use server'`.
 
+`app/todos/actions.ts`:
+
 ```ts
-// app/todos/actions.ts
 'use server'
 
 import { agent } from 'actionmcp/server'
@@ -86,8 +88,9 @@ Your UI can call the same function: `await addTodo({ text })`.
 
 `<AgentTools />` is a Server Component. The tools exist while the layout that renders it is mounted.
 
+`app/layout.tsx`:
+
 ```tsx
-// app/layout.tsx
 import { AgentTools } from 'actionmcp'
 import type { ReactNode } from 'react'
 
@@ -124,11 +127,9 @@ listTodos  agent  read-only      consequential  none             app/todos/actio
 
 Add the devtools panel during development. It lists the registered tools, runs them with JSON input, and shows whether WebMCP is native or comes from the polyfill.
 
-```tsx
-// app/layout.tsx
-import { AgentTools, AgentToolsDevtools } from 'actionmcp'
+In `app/layout.tsx`, import `AgentToolsDevtools` from `actionmcp` and render both components inside `<body>`:
 
-// inside <body>
+```tsx
 <AgentTools polyfill />
 <AgentToolsDevtools />
 ```
@@ -141,8 +142,9 @@ When an agent calls `addTodo`, the page shows a dialog with the tool name, the d
 
 If your actions already use `useActionState` or next-safe-action, list them in `agent-tools.ts` instead of wrapping them.
 
+`agent-tools.ts` (project root):
+
 ```ts
-// agent-tools.ts (project root)
 import 'server-only'
 import { defineAgentTools, fromFormDataAction, fromSafeAction, tool } from 'actionmcp/server'
 import { inviteMember } from './app/team/actions'

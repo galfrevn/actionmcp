@@ -16,8 +16,9 @@ Until the first npm release, build the package from this repository with `pnpm i
 
 Wrap the Next.js config. This generates the tool registry during `next build` and `next dev`.
 
+`next.config.ts`:
+
 ```ts
-// next.config.ts
 import { withAgentTools } from 'actionmcp/config'
 import type { NextConfig } from 'next'
 
@@ -26,10 +27,11 @@ const nextConfig: NextConfig = {}
 export default withAgentTools()(nextConfig)
 ```
 
-Mark a Server Function as a tool, with a description and a Standard Schema input.
+Mark a Server Function as a tool, with a description and a Standard Schema input. Your auth check stays in the action.
+
+`app/todos/actions.ts`:
 
 ```ts
-// app/todos/actions.ts
 'use server'
 import { agent } from 'actionmcp/server'
 import { z } from 'zod'
@@ -40,7 +42,7 @@ export const addTodo = agent(
     input: z.object({ text: z.string().min(1).max(200) }),
   },
   async ({ text }) => {
-    const user = await requireUser() // your auth check stays in the action
+    const user = await requireUser()
     return db.todo.create({ data: { text, userId: user.id } })
   },
 )
@@ -48,8 +50,9 @@ export const addTodo = agent(
 
 Register the tools in a layout. They exist while that layout is mounted.
 
+`app/todos/layout.tsx`:
+
 ```tsx
-// app/todos/layout.tsx
 import { AgentTools } from 'actionmcp'
 
 export default function Layout({ children }: { children: React.ReactNode }) {

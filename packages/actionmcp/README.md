@@ -16,8 +16,9 @@ actionmcp requires Next.js 16.x and React 19.2 or later.
 
 ## Usage
 
+`next.config.ts`:
+
 ```ts
-// next.config.ts
 import { withAgentTools } from 'actionmcp/config'
 import type { NextConfig } from 'next'
 
@@ -26,8 +27,9 @@ const nextConfig: NextConfig = {}
 export default withAgentTools()(nextConfig)
 ```
 
+`app/todos/actions.ts`:
+
 ```ts
-// app/todos/actions.ts
 'use server'
 import { agent } from 'actionmcp/server'
 import { z } from 'zod'
@@ -44,8 +46,9 @@ export const addTodo = agent(
 )
 ```
 
+`app/todos/layout.tsx`:
+
 ```tsx
-// app/todos/layout.tsx
 import { AgentTools } from 'actionmcp'
 
 export default function Layout({ children }: { children: React.ReactNode }) {

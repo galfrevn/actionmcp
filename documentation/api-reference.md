@@ -171,11 +171,12 @@ The default confirmation component, exported so that a custom one can wrap it.
  * @agent consequential name=task.rename
  */
 export async function renameTask(input: { taskId: string; title: string }) {
-  // validate the input yourself
+  const { taskId, title } = renameTaskSchema.parse(input)
+  return renameOwnedTask(taskId, title)
 }
 ```
 
-Enable it with `jsdoc: true`. The description is the comment text before the first tag. The input schema is inferred from the type of the first parameter. actionmcp does not validate the input at runtime.
+Enable it with `jsdoc: true`. The description is the comment text before the first tag. The input schema is inferred from the type of the first parameter. actionmcp does not validate the input at runtime, so the function validates it.
 
 | Modifier | Effect |
 |---|---|
