@@ -23,6 +23,7 @@ export interface ToolOptionsReading {
 }
 
 const CONFIRM_POLICIES: readonly string[] = ['always', 'consequential', 'never']
+const BOOLEAN_OPTIONS = ['readOnly', 'consequential', 'untrustedOutput'] as const
 
 export function readToolOptions(node: Node | undefined, callOffset: number): ToolOptionsReading {
   const issues: OptionIssue[] = []
@@ -33,15 +34,19 @@ export function readToolOptions(node: Node | undefined, callOffset: number): Too
   const { properties, hasSpread } = readObjectLiteral(node)
   const reading: ToolOptionsReading = { issues }
 
+  if (hasSpread) {
+    issues.push({ code: 'AT005', detail: 'the options contain a spread, which hides values from the analyzer', offset: node.start })
+  }
+
   const description = properties.get('description')
   const descriptionText = staticString(description)
   if (descriptionText !== undefined) {
     reading.description = descriptionText
     if (descriptionText.trim() === '')
       issues.push({ code: 'AT003', detail: 'the description is empty', offset: description?.start ?? node.start })
-  } else if (description || hasSpread) {
-    issues.push({ code: 'AT005', detail: 'the description is not a string literal', offset: description?.start ?? node.start })
-  } else {
+  } else if (description) {
+    issues.push({ code: 'AT005', detail: 'the description is not a string literal', offset: description.start })
+  } else if (!hasSpread) {
     issues.push({ code: 'AT003', detail: 'the description is missing', offset: node.start })
   }
 
@@ -55,15 +60,25 @@ export function readToolOptions(node: Node | undefined, callOffset: number): Too
   const title = staticString(properties.get('title'))
   if (title !== undefined) reading.title = title
 
-  const readOnly = staticBoolean(properties.get('readOnly'))
-  if (readOnly !== undefined) reading.readOnly = readOnly
-  const consequential = staticBoolean(properties.get('consequential'))
-  if (consequential !== undefined) reading.consequential = consequential
-  const untrustedOutput = staticBoolean(properties.get('untrustedOutput'))
-  if (untrustedOutput !== undefined) reading.untrustedOutput = untrustedOutput
+  for (const key of BOOLEAN_OPTIONS) {
+    const property = properties.get(key)
+    if (!property) continue
+    const value = staticBoolean(property)
+    if (value === undefined) issues.push({ code: 'AT005', detail: `\`${key}\` is not a boolean literal`, offset: property.start })
+    else reading[key] = value
+  }
 
-  const confirm = staticString(properties.get('confirm'))
-  if (confirm !== undefined && CONFIRM_POLICIES.includes(confirm)) reading.confirm = confirm as ConfirmPolicy
+  const confirm = properties.get('confirm')
+  if (confirm) {
+    const policy = staticString(confirm)
+    if (policy === undefined) {
+      issues.push({ code: 'AT005', detail: '`confirm` is not a string literal', offset: confirm.start })
+    } else if (CONFIRM_POLICIES.includes(policy)) {
+      reading.confirm = policy as ConfirmPolicy
+    } else {
+      issues.push({ code: 'AT005', detail: `\`confirm\` is "${policy}", not 'always', 'consequential', or 'never'`, offset: confirm.start })
+    }
+  }
 
   const input = properties.get('input')
   if (input) reading.input = input

@@ -246,7 +246,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, `navigate`) |
 | `AT003` | error | Empty description |
 | `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
-| `AT005` | error | `description` is not a string literal, or the options are not an object literal |
+| `AT005` | error | The options are not an object literal or contain a spread, `description` is not a string literal, `readOnly`, `consequential`, or `untrustedOutput` is not a boolean literal, or `confirm` is not one of the three policies as a string literal |
 | `AT006` | error | Unknown `@agent` modifier |
 | `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
 | `AT008` | error | The registry file lists a plain function by reference. Only an `agent()` tool can be listed without `tool(...)`. The check follows relative imports. |

@@ -15,6 +15,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The analyzer follows a relative import of the registry file. It reads an `agent()` tool that the registry lists from a file outside the `scan` globs, and it tells apart two tools with the same export name.
 - An `onBeforeExecute` hook that throws blocks the call with the `blocked` code. Before, the call was rejected.
 - `agent()` and `tool()` throw a `TypeError` for a `confirm` value that is not a policy and for a `readOnly`, `consequential`, or `untrustedOutput` value that is not a boolean.
+- **Breaking:** the `AT005` error also covers `readOnly`, `consequential`, `untrustedOutput`, and `confirm` values that are not literals, an unknown `confirm` policy, and a spread in the options. Before, the analyzer ignored them, so `manifest.json` and `AT103` could disagree with the tool that ran.
 
 ### Fixed
 

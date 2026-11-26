@@ -130,6 +130,34 @@ describe('agent() detection', () => {
     expect(codes(scan(`${SERVER}export const a = agent({ ...shared }, ${authedHandler})\n`))).toEqual(['AT005'])
   })
 
+  it.each([
+    ['readOnly', 'readOnly: Boolean(process.env.READ_ONLY)'],
+    ['consequential', 'consequential: flags.consequential'],
+    ['untrustedOutput', 'untrustedOutput: !trusted'],
+    ['confirm from a variable', 'confirm: policy'],
+    ['confirm from a condition', "confirm: isDev ? 'never' : 'consequential'"],
+    ['confirm with an unknown policy', "confirm: 'sometimes'"],
+  ])('reports AT005 when %s is not a literal the analyzer can read', (_label, option) => {
+    const result = scan(`${SERVER}export const a = agent({ ${DESCRIPTION}, ${option} }, ${authedHandler})\n`)
+    expect(codes(result)).toEqual(['AT005'])
+    expect(result.tools[0]?.diagnostics).toEqual(['AT005'])
+  })
+
+  it('reports AT005 for a spread next to a literal description', () => {
+    expect(codes(scan(`${SERVER}export const a = agent({ ${DESCRIPTION}, ...defaults }, ${authedHandler})\n`))).toEqual(['AT005'])
+  })
+
+  it('reads literal behavior options without a diagnostic', () => {
+    const result = scan(
+      `${SERVER}export const a = agent({ ${DESCRIPTION}, readOnly: true, consequential: false, untrustedOutput: true, confirm: 'always' }, ${authedHandler})\n`,
+    )
+    expect(result.diagnostics).toEqual([])
+    expect(result.tools[0]).toMatchObject({
+      confirm: 'always',
+      annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: true },
+    })
+  })
+
   it('accepts a template literal without expressions', () => {
     const result = scan(`${SERVER}export const a = agent({ description: \`Add an item to the todo list.\` }, ${authedHandler})\n`)
     expect(result.diagnostics).toEqual([])

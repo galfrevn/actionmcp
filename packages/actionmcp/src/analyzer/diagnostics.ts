@@ -32,7 +32,7 @@ export const DIAGNOSTIC_RULES = {
   AT005: {
     level: 'error',
     summary: 'Tool options are not literals',
-    fix: 'Pass an object literal with a string literal `description`. Metadata must come from source code, never from data.',
+    fix: "Pass an object literal without spreads, with a string literal `description`, boolean literals for `readOnly`, `consequential`, and `untrustedOutput`, and 'always', 'consequential', or 'never' for `confirm`. Metadata must come from source code, never from data.",
   },
   AT006: {
     level: 'error',

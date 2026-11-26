@@ -13,7 +13,7 @@ The guiding principle: exposing a Server Function as a tool must not add attack 
 | Human confirmation | Before a consequential tool runs, the page shows a dialog with the tool name, the description, and each field of the input. The action runs only after a click on "Allow". No tool can answer the dialog. |
 | Native RPC only | A tool call is the same POST that your UI sends: the encrypted action ID, the `Origin` check, and the user's cookies. actionmcp adds no endpoint and holds no credentials. |
 | Server-side input validation | `agent()` validates the input with your schema before the handler runs. |
-| Literal metadata | The `name` and the `description` of a tool must be string literals in your source code. The build stops otherwise. The check does not cover the field descriptions and titles inside a schema. |
+| Literal metadata | The `name` and the `description` of a tool must be string literals in your source code. `readOnly`, `consequential`, `untrustedOutput`, and `confirm` must be literals too, so that `inspect` and `manifest.json` show what runs. The build stops otherwise. The check does not cover the field descriptions and titles inside a schema. |
 | Quiet errors | An unexpected error in an `agent()` handler returns a generic message in production and is logged on the server. Validation issues contain a message and a path, and no stack trace. An output that does not match its schema is logged on the server with the same two fields, without the values. |
 | Devtools in development only | `<AgentToolsDevtools />` renders nothing in a production build. |
 

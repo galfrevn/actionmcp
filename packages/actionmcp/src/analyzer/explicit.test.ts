@@ -86,6 +86,23 @@ describe('scanRegistryModule', () => {
     expect(codes(scan(`export default defineAgentTools({ a: tool(loginUser, options) })`))).toEqual(['AT005'])
   })
 
+  it('reports AT005 for behavior options that are not literals', () => {
+    expect(
+      codes(
+        scan(
+          `export default defineAgentTools({ a: tool(loginUser, { description: 'Check that the session is valid.', confirm: policy }) })`,
+        ),
+      ),
+    ).toEqual(['AT005'])
+    expect(
+      codes(
+        scan(
+          `export default defineAgentTools({ a: tool(loginUser, { description: 'Check that the session is valid.', readOnly: isReadOnly }) })`,
+        ),
+      ),
+    ).toEqual(['AT005'])
+  })
+
   it("reports AT103 for a consequential tool with confirm: 'never'", () => {
     const result = scan(
       `export default defineAgentTools({ a: tool(loginUser, { description: 'Delete every project in the team.', confirm: 'never' }) })`,
