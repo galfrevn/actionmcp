@@ -1,0 +1,26 @@
+{
+  "name": "fixture-coexist",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@w3c/webmcp-polyfill": "^0.2.0",
+    "actionmcp": "workspace:*",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "use-webmcp-tool": "^0.4.0",
+    "webmcp-types": "^0.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "~6.0.3"
+  }
+}
