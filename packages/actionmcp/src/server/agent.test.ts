@@ -117,9 +117,27 @@ describe('agent', () => {
   it('fails without returning data when the output does not match its schema', async () => {
     const output = z.object({ id: z.number() })
     const tool = agent({ description: 'Create a todo.', output }, async () => ({ id: 'not-a-number', secret: 'x' }) as never)
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const result = await tool()
     expect(result).toEqual({ ok: false, error: { code: 'failed', message: INVALID_OUTPUT_MESSAGE } })
     expect(JSON.stringify(result)).not.toContain('secret')
+    expect(logged).toHaveBeenCalledWith(
+      'actionmcp: the output of the tool described as "Create a todo." does not match its output schema.',
+      [expect.objectContaining({ path: ['id'] })],
+    )
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('not-a-number')
+    logged.mockRestore()
+  })
+
+  it('names the tool in the log when the output of a named tool does not match', async () => {
+    const tool = agent(
+      { name: 'todos.create', description: 'Create a todo.', output: z.object({ id: z.number() }) },
+      async () => ({}) as never,
+    )
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await tool()
+    expect(logged.mock.calls[0]?.[0]).toBe('actionmcp: the output of the tool "todos.create" does not match its output schema.')
+    logged.mockRestore()
   })
 })
 

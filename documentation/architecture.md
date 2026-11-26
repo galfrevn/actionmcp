@@ -257,7 +257,7 @@ No agent guarantees its own confirmation for consequential tools, so the page as
 
 ### `agent()` validates its output
 
-When a tool declares an `output` schema, `agent()` validates the handler's return value on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, removes undeclared fields. If validation fails, the tool returns a `failed` result and none of the data. For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
+When a tool declares an `output` schema, `agent()` validates the handler's return value on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, removes undeclared fields. If validation fails, the tool returns a `failed` result and none of the data, and logs the message and the path of each issue on the server. For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
 
 ### A thin, owned registration layer
 
