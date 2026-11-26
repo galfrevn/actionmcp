@@ -121,6 +121,24 @@ describe('Registrar', () => {
     logged.mockRestore()
   })
 
+  it('logs the error of each tool when the page has no tools permission', async () => {
+    const denied = new DOMException('The tools feature is not allowed in this document.', 'NotAllowedError')
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const registerTool = vi.spyOn(context, 'registerTool').mockRejectedValue(denied)
+    Object.defineProperty(context, 'waitForToolsUntil', {
+      value: () => {
+        throw denied
+      },
+      configurable: true,
+    })
+    await render(<Registrar tools={[createTool()]} />)
+    Reflect.deleteProperty(context, 'waitForToolsUntil')
+    registerTool.mockRestore()
+    expect(logged).toHaveBeenCalledWith('actionmcp: the browser rejected the tool "deleteAccount".', denied)
+    expect(logged).not.toHaveBeenCalledWith('actionmcp: the tools could not be registered.', expect.anything())
+    logged.mockRestore()
+  })
+
   it('names the cause when two registrars register the same tool', async () => {
     const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
     await render(

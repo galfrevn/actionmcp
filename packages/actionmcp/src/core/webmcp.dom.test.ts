@@ -230,6 +230,23 @@ describe('with a native-like context', () => {
     expect(context.waitForToolsUntil).toHaveBeenCalledWith(expect.any(Promise))
   })
 
+  it.each(['NotAllowedError', 'InvalidStateError'])('registers the tools when waitForToolsUntil throws %s', async (name) => {
+    const context = createNativeContext()
+    context.waitForToolsUntil.mockImplementation(() => {
+      throw new DOMException('The document cannot provide tools.', name)
+    })
+    const results = await registerTools(context, [createTool('iota')], { signal: new AbortController().signal })
+    expect(results).toEqual([{ status: 'fulfilled', value: 'iota' }])
+  })
+
+  it('rethrows an error of waitForToolsUntil that the browser does not define', () => {
+    const context = createNativeContext()
+    context.waitForToolsUntil.mockImplementation(() => {
+      throw new TypeError('waitForToolsUntil is broken.')
+    })
+    expect(() => registerTools(context, [createTool('kappa')], { signal: new AbortController().signal })).toThrow(TypeError)
+  })
+
   it('does not retry after the signal aborts', async () => {
     const controller = new AbortController()
     controller.abort()
