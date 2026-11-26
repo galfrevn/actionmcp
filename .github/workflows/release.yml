@@ -1,23 +1,73 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
-      dist-tag:
-        description: npm dist-tag
-        default: latest
-        required: true
+      dry-run:
+        description: Verify and pack without publishing
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
 jobs:
-  publish:
-    name: Publish actionmcp to npm
+  verify:
+    name: Verify the release
     runs-on: ubuntu-latest
-    environment: npm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist-tag: ${{ steps.version.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Read the package version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./packages/actionmcp/package.json').version")
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match the package version $VERSION."
+            exit 1
+          fi
+          if npm view "actionmcp@$VERSION" version > /dev/null 2>&1; then
+            echo "::error::actionmcp@$VERSION is already on npm. Bump the version in packages/actionmcp/package.json."
+            exit 1
+          fi
+          case "$VERSION" in
+            *-*) DIST_TAG=next ;;
+            *) DIST_TAG=latest ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist-tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:package
+      - name: Pack without publishing
+        run: npm publish --dry-run --access public --tag ${{ steps.version.outputs.dist-tag }}
+        working-directory: packages/actionmcp
+
+  publish:
+    name: Publish to npm
+    needs: verify
+    if: github.ref_type == 'tag' || inputs.dry-run == false
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/actionmcp/v/${{ needs.verify.outputs.version }}
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -26,12 +76,19 @@ jobs:
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org
-      - run: pnpm lint
       - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm test:package
-      - run: pnpm publish --provenance --access public --tag ${{ inputs.dist-tag }} --no-git-checks
+      - name: Publish with provenance
+        run: npm publish --provenance --access public --tag ${{ needs.verify.outputs.dist-tag }}
         working-directory: packages/actionmcp
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create the GitHub release
+        run: |
+          TAG="v${{ needs.verify.outputs.version }}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "The release $TAG already exists."
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
