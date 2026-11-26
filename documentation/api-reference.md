@@ -1,0 +1,213 @@
+# API reference
+
+This page describes the exports of actionmcp v0.1. The API can change in any 0.x release.
+
+| Entry point | Use it in | Exports |
+|---|---|---|
+| `actionmcp/server` | `'use server'` files and `agent-tools.ts` | `agent`, `tool`, `defineAgentTools`, `createRegistry`, `fromFormDataAction`, `fromFormAction`, `fromSafeAction`, `AgentToolError` |
+| `actionmcp` | Server Components | `AgentTools`, and the client exports below |
+| `actionmcp/client` | `'use client'` files | `AgentToolsProvider`, `AgentToolsDevtools`, `ConfirmDialog` |
+| `actionmcp/config` | `next.config.ts` | `withAgentTools` |
+| `actionmcp` (binary) | the terminal | `generate`, `inspect`, `doctor` |
+
+## `actionmcp/server`
+
+### `agent(options, handler)`
+
+Defines a Server Function that is also a tool. Call it at the top level of a `'use server'` file and export the result.
+
+```ts
+export const renameProject = agent(
+  {
+    description: 'Rename a project of the signed-in user. Returns the updated project.',
+    input: z.object({ projectId: z.string(), name: z.string().min(1).max(80) }),
+    output: z.object({ id: z.string(), name: z.string() }),
+  },
+  async ({ projectId, name }) => {
+    const user = await requireUser()
+    return renameOwnedProject(user.id, projectId, name)
+  },
+)
+```
+
+| Option | Type | Default | Meaning |
+|---|---|---|---|
+| `description` | string literal | required | What the tool does, its side effects, and what it returns. |
+| `input` | Standard Schema | none | Validated on the server before the handler. A tool without `input` ignores what the caller sends. |
+| `output` | Standard Schema | none | Validated on the server after the handler. The validated value is returned, so a schema that strips unknown keys filters the output. |
+| `name` | string literal | the export name | 1 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`, and `.`. |
+| `title` | string | none | Label for browser UIs and the confirmation dialog. |
+| `readOnly` | boolean | `false` | Sets `readOnlyHint`. |
+| `consequential` | boolean | `!readOnly` | Sets `consequentialHint`. |
+| `untrustedOutput` | boolean | `false` | Sets `untrustedContentHint`. |
+| `confirm` | `'always'`, `'consequential'`, `'never'` | `'consequential'` | When the page asks a human before the tool runs. |
+
+The returned function has the signature `(input) => Promise<AgentResult<Data>>`, or `() => Promise<AgentResult<Data>>` for a tool without `input`.
+
+### `AgentResult<Data>`
+
+```ts
+type AgentResult<Data> =
+  | { ok: true; data: Data }
+  | { ok: false; error: { code: string; message: string; issues?: Array<{ message: string; path: Array<string | number> }> } }
+```
+
+| Code | Source |
+|---|---|
+| `invalid_input` | The input did not match the schema. `issues` lists each problem. |
+| `unauthorized` | By convention, thrown by your auth check with `AgentToolError`. |
+| `failed` | The handler threw, or the output did not match the `output` schema. |
+| `declined` | The user cancelled the confirmation. Added in the browser. |
+| `blocked` | `onBeforeExecute` returned `false`. Added in the browser. |
+
+### `AgentToolError`
+
+```ts
+throw new AgentToolError('not_found', 'There is no project with that id.')
+```
+
+Thrown inside an `agent()` handler, it becomes `{ ok: false, error: { code, message } }`. The message reaches the agent, so do not put internal details in it.
+
+### `defineAgentTools(tools)` and `tool(action, options)`
+
+Lists existing actions as tools. Put the call in `agent-tools.ts` at the project root, as the default export, with an object literal.
+
+```ts
+export default defineAgentTools({
+  'team.inviteMember': tool(fromFormDataAction(inviteMember), {
+    description: 'Invite a person to the current team by email with a role. Returns a confirmation message.',
+    input: inviteMemberSchema,
+  }),
+})
+```
+
+- The key is the tool name, unless the options set `name`.
+- `tool()` takes the same options as `agent()`. `input` and `output` describe the tool and are not enforced, because the action runs unchanged.
+- A value can also be an `agent()` tool. It is then registered once, under the key.
+
+### Adapters
+
+| Function | Wraps | The browser calls |
+|---|---|---|
+| `fromFormDataAction(action)` | `(previousState, formData) => Promise<State>` | `action(undefined, formData)` |
+| `fromFormAction(action)` | `(formData) => Promise<unknown>` | `action(formData)` |
+| `fromSafeAction(action)` | a next-safe-action action | `action(input)`, then unwraps `data`, `serverError`, and `validationErrors` |
+
+The `FormData` is built from the agent's input object: an array becomes repeated keys, `true` becomes `'on'`, `false`, `null`, and `undefined` are omitted, and a nested object becomes a JSON string.
+
+A result of the form `{ error: 'message' }` becomes a `failed` result. Any other value becomes `{ ok: true, data }`.
+
+### `createRegistry(sources)`
+
+Builds the registry from generated code. The generated `.agent-tools/registry.ts` calls it. You do not call it yourself.
+
+## `actionmcp`
+
+### `<AgentTools />`
+
+A Server Component that registers tools while it is mounted.
+
+| Prop | Type | Default | Meaning |
+|---|---|---|---|
+| `include` | `string[]` | all tools | Names to register. `*` matches any characters. |
+| `exclude` | `string[]` | none | Names to leave out. Applied after `include`. |
+| `prefix` | `string` | none | Prepended to every name, including `navigate`. |
+| `navigate` | `boolean` or `{ routes?: string[] }` | `false` | Registers the navigation tool. See below. |
+| `polyfill` | `boolean` | `false` | Loads `@w3c/webmcp-polyfill` when `document.modelContext` is missing. |
+| `exposedTo` | `string[]` | none | Origins passed to `registerTool`, for tools in cross-origin frames. |
+| `originTrialToken` | `string` | `NEXT_PUBLIC_WEBMCP_OT_TOKEN` | Renders `<meta http-equiv="origin-trial">`. |
+| `registry` | `AgentToolRegistry` | the generated registry | For setups without `withAgentTools()`. |
+
+In development, an invalid, reserved, or duplicate name throws. In production it logs a warning and the tool is skipped.
+
+### The `navigate` tool
+
+Input: `{ route, params?, query? }`. `route` is one of the listed route patterns, such as `/projects/[id]`. `params` fills the dynamic segments, and a catch-all takes a path such as `guides/setup`. The tool calls `router.push()` and returns `{ ok: true, data: { url } }`. It needs no confirmation.
+
+- `navigate` lists routes without dynamic segments and dynamic routes whose page exports `generateStaticParams`.
+- `navigate={{ routes: ['/projects/*', '/docs/**'] }}` lists the routes whose pattern matches a glob. `*` stays inside one segment and `**` crosses segments.
+
+Route groups, private folders, parallel route slots, intercepted routes, route handlers, and `app/api` are never listed.
+
+### `<AgentToolsProvider />`
+
+A Client Component that configures the tools registered below it.
+
+| Prop | Type | Meaning |
+|---|---|---|
+| `onBeforeExecute` | `(call) => boolean \| Promise<boolean>` | Runs after the confirmation. `false` blocks the call. |
+| `onAfterExecute` | `(call, result) => void` | Runs after the action, with the result that the agent receives. |
+| `confirmComponent` | `ComponentType<ConfirmProps>` | Replaces the default dialog. Call `onConfirm` or `onCancel` exactly once. |
+
+`call` is `{ name, input, annotations, source: 'agent' }`.
+
+### `<AgentToolsDevtools />`
+
+A floating panel that renders only when `NODE_ENV` is `development`. It shows whether WebMCP is native, from the polyfill, or unavailable, lists every tool on the page, runs a tool with JSON input, and keeps a history of calls to actionmcp tools.
+
+### `ConfirmDialog`
+
+The default confirmation component, exported so that a custom one can wrap it.
+
+## `actionmcp/config`
+
+### `withAgentTools(options)(nextConfig)`
+
+| Option | Type | Default | Meaning |
+|---|---|---|---|
+| `registry` | `string` | `./agent-tools.ts` if it exists | The explicit registry file. |
+| `scan` | `string[]` | `['app/**', 'lib/**', 'src/**']` | Globs to scan for `agent()` and `@agent`. |
+| `outDir` | `string` | `.agent-tools` | Where the registry and the manifest are written. |
+| `jsdoc` | `boolean` | `false` | Enables the experimental `@agent` path. |
+| `auth` | `string[]` | common names such as `auth` and `requireUser` | Function names that count as an auth check for `AT105`. |
+
+`nextConfig` can be an object or a function. During `next build`, an `AT0xx` error stops the build with the file and the line.
+
+## The `@agent` tag (experimental)
+
+```ts
+/**
+ * Rename a task of the current workspace. Returns the updated task.
+ * @agent consequential name=task.rename
+ */
+export async function renameTask(input: { taskId: string; title: string }) {
+  // validate the input yourself
+}
+```
+
+Enable it with `jsdoc: true`. The description is the comment text before the first tag. The input schema is inferred from the type of the first parameter. actionmcp does not validate the input at runtime.
+
+| Modifier | Effect |
+|---|---|
+| `readonly` | `readOnlyHint` |
+| `consequential` | `consequentialHint` (already the default for a tool that is not read-only) |
+| `untrusted-output` | `untrustedContentHint` |
+| `name=<tool-name>` | The tool name |
+| `formdata` | The function takes `(previousState, formData)` or `(formData)`. No schema is inferred. |
+
+## CLI
+
+```bash
+npx actionmcp generate [--watch]
+npx actionmcp inspect [tool] [--json]
+npx actionmcp doctor [--json]
+```
+
+| Flag | Meaning |
+|---|---|
+| `--cwd <dir>` | Project directory. |
+| `--registry <file>` | Explicit registry file. |
+| `--scan <glob>` | Glob to scan. Repeatable. |
+| `--out-dir <dir>` | Output folder. |
+| `--jsdoc` | Enable the `@agent` path. |
+| `--json` | Machine-readable output for `inspect` and `doctor`. |
+
+Without flags, the CLI uses the options that `next.config` passes to `withAgentTools()`.
+
+`generate` and `doctor` exit with status 1 when they find an error. The diagnostic codes are in the [specification](spec.md#cli).
+
+## Generated files
+
+- `.agent-tools/registry.ts`: imported by `<AgentTools />` through the `actionmcp/registry` alias. Do not edit it.
+- `.agent-tools/manifest.json`: the list of tools with their source, annotations, confirmation policy, and diagnostics. Commit it if you want tool changes to show up in pull requests.
+- `.agent-tools/cache/types.json`: the schema cache of the `@agent` path.
