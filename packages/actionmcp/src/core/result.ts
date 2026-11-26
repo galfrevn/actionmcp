@@ -1,4 +1,4 @@
-import { isRecord } from './guards'
+import { isNonEmptyString, isRecord } from './guards'
 import type { SchemaIssue } from './schema'
 import type { ToolAdapter } from './types'
 
@@ -61,18 +61,23 @@ export function normalizeActionResult(raw: unknown, adapter?: ToolAdapter): Agen
     return toJsonSafe(raw) as AgentResult<unknown>
   }
   if (isRecord(raw)) {
-    if (isPresent(raw.serverError)) {
-      return fail('failed', typeof raw.serverError === 'string' ? raw.serverError : GENERIC_FAILURE_MESSAGE)
-    }
-    if (isPresent(raw.validationErrors)) {
-      return fail('invalid_input', INVALID_INPUT_MESSAGE, collectIssues(raw.validationErrors, []))
-    }
-    if (typeof raw.error === 'string' && raw.error) {
-      return fail('failed', raw.error)
-    }
+    const failure = readFailure(raw, adapter)
+    if (failure) return failure
   }
   const data = adapter === 'safe-action' && isRecord(raw) ? raw.data : raw
   return succeed(toJsonSafe(data))
+}
+
+function readFailure(raw: Record<string, unknown>, adapter: ToolAdapter | undefined): AgentResult<never> | undefined {
+  if (isPresent(raw.serverError)) {
+    return fail('failed', isNonEmptyString(raw.serverError) ? raw.serverError : GENERIC_FAILURE_MESSAGE)
+  }
+  const validationIssues = collectIssues(raw.validationErrors, [])
+  if (validationIssues.length > 0) return fail('invalid_input', INVALID_INPUT_MESSAGE, validationIssues)
+  const formIssues = adapter === 'formdata' || adapter === 'form' ? collectIssues(raw.errors, []) : []
+  if (formIssues.length > 0) return fail('invalid_input', isNonEmptyString(raw.message) ? raw.message : INVALID_INPUT_MESSAGE, formIssues)
+  const errorMessage = isRecord(raw.error) ? raw.error.message : raw.error
+  return isNonEmptyString(errorMessage) ? fail('failed', errorMessage) : undefined
 }
 
 export function toJsonSafe(value: unknown): unknown {

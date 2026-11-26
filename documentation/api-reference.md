@@ -101,7 +101,16 @@ export default defineAgentTools({
 
 The `FormData` is built from the agent's input object: an array becomes repeated keys, `true` becomes `'on'`, `false`, `null`, and `undefined` are omitted, and a nested object becomes a JSON string.
 
-A result of the form `{ error: 'message' }` becomes a `failed` result. Any other value becomes `{ ok: true, data }`.
+The result of an adapted or listed action becomes a failure in these cases. Any other value becomes `{ ok: true, data }`.
+
+| The action returns | The agent receives |
+|---|---|
+| `{ serverError }` | `failed`, with `serverError` as the message when it is a non-empty string |
+| `{ validationErrors }` with at least one message | `invalid_input`, with an issue for each message |
+| `{ errors }` with at least one message, from `fromFormDataAction()` or `fromFormAction()` | `invalid_input`, with an issue for each message and `message` as the message when it is a string |
+| `{ error: 'message' }` or `{ error: { message } }` | `failed`, with that message |
+
+An empty `validationErrors` or `errors`, such as `{}`, is not a failure.
 
 ### `createRegistry(sources)`
 
