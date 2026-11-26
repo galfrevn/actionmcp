@@ -111,10 +111,17 @@ export function registerTools(
   options: RegisterToolsOptions,
 ): Promise<PromiseSettledResult<string>[]> {
   const registrations = Promise.allSettled(tools.map((tool) => registerTool(context, tool, options, 1)))
-  if (typeof context.waitForToolsUntil === 'function') {
-    context.waitForToolsUntil(registrations)
-  }
+  announceRegistrations(context, registrations)
   return registrations
+}
+
+function announceRegistrations(context: ModelContext, registrations: Promise<unknown>): void {
+  if (typeof context.waitForToolsUntil !== 'function') return
+  try {
+    context.waitForToolsUntil(registrations)
+  } catch (error) {
+    if (!(error instanceof DOMException)) throw error
+  }
 }
 
 function suffixedName(name: string, attempt: number): string {

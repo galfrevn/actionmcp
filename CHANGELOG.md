@@ -2,7 +2,7 @@
 
 This project follows [Semantic Versioning](https://semver.org). While the version is 0.x, a minor release can contain breaking changes.
 
-## Unreleased
+## 0.3.0
 
 ### Added
 
@@ -48,6 +48,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - A failed import of the polyfill is logged, and the next `<AgentTools />` that mounts loads it again. Before, the failure stayed cached until a reload and produced an unhandled promise rejection.
 - The devtools panel reports "native" only when `registerTool` and the constructor of `document.modelContext` are browser functions. Before, a context built by a script around a bound function showed as native.
 - The next confirmation in the queue opens as a new dialog with the focus on "Cancel". Before, it reused the previous dialog and kept the focus on "Allow", so Enter approved it.
+- A `waitForToolsUntil` that throws, as it does on a page without the `tools` permission, no longer stops the registration. In development, the error of each tool is logged. Before, it produced an unhandled promise rejection.
 
 ## 0.2.0
 

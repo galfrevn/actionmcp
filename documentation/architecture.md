@@ -169,7 +169,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 - The `execute` callback reads the latest Server Function reference from a ref.
 - If `document.modelContext` is missing and `polyfill` is set, it loads `@w3c/webmcp-polyfill`. If the import fails, for example after a deployment removes the chunk, it logs the error, and the next `<AgentTools />` that mounts loads it again.
 - If `document.modelContext` is missing and `polyfill` is not set, it checks again 250 ms, 1 s, and 4 s later, for a context that a browser extension installs after the page loads. After the last check it registers nothing.
-- It calls `waitForToolsUntil` when the browser has it.
+- It calls `waitForToolsUntil` when the browser has it. The browser throws `NotAllowedError` there on a page without the `tools` permission, and `InvalidStateError` in a document that is not fully active. The Registrar ignores both, because each registration then fails with its own error.
 - In development, it logs a warning once when the page is not a secure context, because WebMCP and the polyfill exist only in secure contexts.
 - In development, it logs each tool that the browser rejects, with the error. The browser rejects, for example, an `exposedTo` origin that is not a trustworthy URL, or a page whose Permissions Policy does not allow the `tools` feature.
 - If a name is already taken, the tool is registered with a `_2` suffix, then `_3`, and a warning is logged in development. The browser reports a taken name, an invalid name, and an inactive document with the same `InvalidStateError`, so the Registrar retries only while the suffixed name is valid.
