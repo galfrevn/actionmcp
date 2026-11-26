@@ -10,8 +10,6 @@ actionmcp turns the Server Functions and routes that you opt in, in a Next.js Ap
 npm install actionmcp
 ```
 
-Until the first npm release, build the package from this repository with `pnpm install && pnpm build`.
-
 ## Usage
 
 Wrap the Next.js config. This generates the tool registry during `next build` and `next dev`.
