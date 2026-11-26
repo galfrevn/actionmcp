@@ -222,7 +222,7 @@ interface RouteEntry {
 }
 ```
 
-The tool's input schema lists the allowed patterns as an enum. The tool builds the URL from `params` and `query`, calls `router.push()`, and returns `{ ok: true, data: { url } }`. It accepts only a route from its enum. It rejects a parameter that contains the path segment `.` or `..`, because the browser would resolve that segment to a route outside the enum.
+The tool's input schema lists the allowed patterns as an enum. The description of `route` names each pattern with the literal `metadata.title` of its page and the names of its parameters, such as `/projects/[id] ("Project"; params: id)`. The tool builds the URL from `params` and `query`, calls `router.push()`, and returns `{ ok: true, data: { url } }`. It accepts only a route from its enum. It rejects a parameter that contains the path segment `.` or `..`, because the browser would resolve that segment to a route outside the enum.
 
 ### Reserved names
 

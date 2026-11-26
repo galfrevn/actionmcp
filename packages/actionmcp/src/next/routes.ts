@@ -13,6 +13,10 @@ export interface NavigateInput {
 
 const DOT_SEGMENTS = new Set(['.', '..'])
 
+const PARAMS_DESCRIPTION =
+  'The value of each dynamic segment of the route, by name. A catch-all segment takes a path such as "guides/setup".'
+const QUERY_DESCRIPTION = 'Search parameters to add to the URL.'
+
 export const NAVIGATE_DESCRIPTION = 'Navigate this app to one of its pages. Available tools may change after navigating.'
 
 export function selectRoutes(routes: readonly RouteEntry[], options: NavigateOptions | true): RouteEntry[] {
@@ -27,12 +31,24 @@ export function navigateInputSchema(routes: readonly RouteEntry[]): JsonSchema {
   return {
     type: 'object',
     properties: {
-      route: { type: 'string', enum: routes.map((route) => route.pattern) },
-      params: { type: 'object', additionalProperties: { type: 'string' } },
-      query: { type: 'object', additionalProperties: { type: 'string' } },
+      route: { type: 'string', enum: routes.map((route) => route.pattern), description: describeRoutes(routes) },
+      params: { type: 'object', additionalProperties: { type: 'string' }, description: PARAMS_DESCRIPTION },
+      query: { type: 'object', additionalProperties: { type: 'string' }, description: QUERY_DESCRIPTION },
     },
     required: ['route'],
   }
+}
+
+function describeRoutes(routes: readonly RouteEntry[]): string {
+  const described = routes.map((route) => {
+    const details = [
+      route.title ? `"${route.title}"` : undefined,
+      route.params.length > 0 ? `params: ${route.params.join(', ')}` : undefined,
+    ]
+    const known = details.filter((detail) => detail !== undefined)
+    return known.length > 0 ? `${route.pattern} (${known.join('; ')})` : route.pattern
+  })
+  return `The page to open: ${described.join(', ')}.`
 }
 
 export function buildHref(routes: readonly RouteEntry[], input: NavigateInput): string {

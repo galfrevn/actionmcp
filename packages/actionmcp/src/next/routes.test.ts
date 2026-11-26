@@ -27,16 +27,31 @@ describe('selectRoutes', () => {
 })
 
 describe('navigateInputSchema', () => {
-  it('lists the allowed routes as an enum', () => {
+  it('lists the allowed routes as an enum and describes each one', () => {
     expect(navigateInputSchema(routes.slice(0, 2))).toEqual({
       type: 'object',
       properties: {
-        route: { type: 'string', enum: ['/', '/todos'] },
-        params: { type: 'object', additionalProperties: { type: 'string' } },
-        query: { type: 'object', additionalProperties: { type: 'string' } },
+        route: { type: 'string', enum: ['/', '/todos'], description: 'The page to open: /, /todos.' },
+        params: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'The value of each dynamic segment of the route, by name. A catch-all segment takes a path such as "guides/setup".',
+        },
+        query: { type: 'object', additionalProperties: { type: 'string' }, description: 'Search parameters to add to the URL.' },
       },
       required: ['route'],
     })
+  })
+
+  it('names the title and the params of each route in the route description', () => {
+    const described = navigateInputSchema([
+      { pattern: '/', params: [], title: 'Home' },
+      { pattern: '/projects/[id]', params: ['id'], title: 'Project' },
+      { pattern: '/docs/[...path]', params: ['path'], catchAll: 'path' },
+    ])
+    expect((described.properties as { route: { description: string } }).route.description).toBe(
+      'The page to open: / ("Home"), /projects/[id] ("Project"; params: id), /docs/[...path] (params: path).',
+    )
   })
 })
 

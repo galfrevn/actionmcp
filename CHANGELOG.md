@@ -20,6 +20,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - `agent()` and `tool()` throw a `TypeError` for a `confirm` value that is not a policy and for a `readOnly`, `consequential`, or `untrustedOutput` value that is not a boolean.
 - **Breaking:** the `AT005` error also covers `readOnly`, `consequential`, `untrustedOutput`, and `confirm` values that are not literals, an unknown `confirm` policy, and a spread in the options. Before, the analyzer ignored them, so `manifest.json` and `AT103` could disagree with the tool that ran.
 - The confirmation dialog lists the fields in the order of the input schema, then the fields that the schema does not declare, labeled with the `extra` label of `ConfirmLabels`. A long value scrolls inside its own row. Before, the agent chose the order of the rows and the label of an undeclared field, and a long value could push the other fields out of view.
+- The input schema of the `navigate` tool describes each route with the literal `metadata.title` of its page and the names of its parameters. Before, the agent saw only the patterns.
 
 ### Fixed
 
