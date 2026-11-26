@@ -14,6 +14,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 
 - The analyzer follows a relative import of the registry file. It reads an `agent()` tool that the registry lists from a file outside the `scan` globs, and it tells apart two tools with the same export name.
 - An `onBeforeExecute` hook that throws blocks the call with the `blocked` code. Before, the call was rejected.
+- `agent()` and `tool()` throw a `TypeError` for a `confirm` value that is not a policy and for a `readOnly`, `consequential`, or `untrustedOutput` value that is not a boolean.
 
 ### Fixed
 

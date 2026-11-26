@@ -29,6 +29,24 @@ describe('agent', () => {
     expect(() => agent({ description }, async () => 1)).toThrow('non-empty description')
   })
 
+  it.each(['Always', 'sometimes', ''])('rejects the confirm policy %j', (confirm) => {
+    expect(() => agent({ description: 'Add a todo.', confirm: confirm as never }, async () => 1)).toThrow(
+      "requires `confirm` to be 'always', 'consequential', or 'never'",
+    )
+  })
+
+  it.each(['readOnly', 'consequential', 'untrustedOutput'])('rejects a %s option that is not a boolean', (key) => {
+    expect(() => agent({ description: 'Add a todo.', [key]: 'false' }, async () => 1)).toThrow(`requires \`${key}\` to be a boolean`)
+  })
+
+  it('accepts every valid policy and boolean', () => {
+    for (const confirm of ['always', 'consequential', 'never'] as const) {
+      expect(() =>
+        agent({ description: 'Add a todo.', confirm, readOnly: false, consequential: true, untrustedOutput: false }, async () => 1),
+      ).not.toThrow()
+    }
+  })
+
   it('passes the validated input to the handler', async () => {
     const handler = vi.fn(async ({ text }: { text: string }) => ({ id: 1, text }))
     const addTodo = agent({ description: 'Add a todo.', input }, handler)

@@ -73,6 +73,13 @@ describe('tool', () => {
   it('rejects an empty description', () => {
     expect(() => tool(plainAction, { description: ' ' })).toThrow('non-empty description')
   })
+
+  it('rejects an unknown confirm policy and a non-boolean flag', () => {
+    expect(() => tool(plainAction, { description: 'Read one item.', confirm: 'sometimes' as never })).toThrow('tool() requires `confirm`')
+    expect(() => tool(plainAction, { description: 'Read one item.', readOnly: 1 as never })).toThrow(
+      'tool() requires `readOnly` to be a boolean',
+    )
+  })
 })
 
 describe('defineAgentTools', () => {

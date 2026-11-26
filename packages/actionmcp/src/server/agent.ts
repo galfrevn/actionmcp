@@ -15,6 +15,9 @@ import type { ConfirmPolicy } from '../core/types'
 
 export const AGENT_META: unique symbol = Symbol.for('actionmcp.meta') as never
 
+const CONFIRM_POLICIES: readonly unknown[] = ['always', 'consequential', 'never']
+const BOOLEAN_OPTIONS = ['readOnly', 'consequential', 'untrustedOutput'] as const
+
 export interface ToolBehaviorOptions {
   name?: string
   title?: string
@@ -60,12 +63,25 @@ export function agent<Data>(
   handler: () => Promise<Data>,
 ): AgentTool<[], Data>
 export function agent(options: AgentToolOptions, handler: (input: never) => Promise<unknown>): AgentTool {
-  if (!isNonEmptyString(options.description)) {
-    throw new TypeError('agent() requires a non-empty description.')
-  }
+  assertToolOptions(options, 'agent()')
   const execute = async (input?: unknown): Promise<AgentResult<unknown>> =>
     runHandler(options, handler as (input: unknown) => Promise<unknown>, input)
   return Object.defineProperty(execute, AGENT_META, { value: { options } }) as unknown as AgentTool
+}
+
+export function assertToolOptions(options: AgentToolOptions, caller: string): void {
+  if (!isNonEmptyString(options.description)) {
+    throw new TypeError(`${caller} requires a non-empty description.`)
+  }
+  for (const key of BOOLEAN_OPTIONS) {
+    const value = options[key]
+    if (value !== undefined && typeof value !== 'boolean') {
+      throw new TypeError(`${caller} requires \`${key}\` to be a boolean.`)
+    }
+  }
+  if (options.confirm !== undefined && !CONFIRM_POLICIES.includes(options.confirm)) {
+    throw new TypeError(`${caller} requires \`confirm\` to be 'always', 'consequential', or 'never'.`)
+  }
 }
 
 export function readAgentMeta(value: unknown): AgentToolMeta | undefined {

@@ -1,7 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { isNonEmptyString } from '../core/guards'
 import type { ConfirmPolicy, JsonSchema, RouteEntry, ServerFunction, ToolAdapter, ToolAnnotations } from '../core/types'
-import { readAgentMeta, type AgentToolOptions } from './agent'
+import { assertToolOptions, readAgentMeta, type AgentToolOptions } from './agent'
 
 const REGISTRY: unique symbol = Symbol.for('actionmcp.registry') as never
 
@@ -67,9 +66,7 @@ export function fromSafeAction(action: (input: never) => Promise<unknown>): Adap
 }
 
 export function tool(action: ServerFunction | AdaptedAction, options: AgentToolOptions): AgentToolDefinition {
-  if (!isNonEmptyString(options.description)) {
-    throw new TypeError('tool() requires a non-empty description.')
-  }
+  assertToolOptions(options, 'tool()')
   return typeof action === 'function' ? { action, options } : { action: action.action, options, adapter: action.adapter }
 }
 

@@ -42,6 +42,8 @@ export const renameProject = agent(
 | `untrustedOutput` | boolean | `false` | Sets `untrustedContentHint`. |
 | `confirm` | `'always'`, `'consequential'`, `'never'` | `'consequential'` | When the page asks a human before the tool runs. |
 
+`agent()` throws a `TypeError` when `description` is empty, when `confirm` is not one of the three policies, or when `readOnly`, `consequential`, or `untrustedOutput` is not a boolean. `tool()` applies the same checks.
+
 The returned function has the signature `(input) => Promise<AgentResult<Data>>`, or `() => Promise<AgentResult<Data>>` for a tool without `input`.
 
 ### `AgentResult<Data>`
