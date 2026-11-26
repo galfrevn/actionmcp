@@ -29,6 +29,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The `errors` field of a form action state, such as `{ errors: { name: ['Required'] } }`, returns `invalid_input` with an issue for each message, and `{ error: { message } }` returns `failed`. An empty `validationErrors` is no longer a failure. Before, the first two returned `ok: true` and the third returned `invalid_input` without issues.
 - A Zod schema with `z.coerce.date()` in the input, or a Zod date in the output, converts to JSON Schema with `{ type: 'string', format: 'date-time' }`. Before, one date field left the tool without its whole schema. `z.date()` in an input still produces `AT101`, with a message that suggests `z.coerce.date()`.
 - An input schema that is a union of objects, such as `z.discriminatedUnion()`, or an `@agent` parameter whose type is a union of object types, is registered with `type: 'object'` next to its `oneOf` or `anyOf`. Before, it produced `AT101` and the tool had no `inputSchema`.
+- The confirmations of every `<AgentTools />` on a page share one queue, so one dialog is open at a time. Before, each `<AgentTools />` had its own queue, and a root layout and a segment layout could open two dialogs at once.
 
 ## 0.2.0
 

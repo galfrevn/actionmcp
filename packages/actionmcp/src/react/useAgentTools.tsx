@@ -1,11 +1,18 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { executeTool, type ToolRuntime } from '../core/execute'
 import type { AgentResult } from '../core/result'
-import type { SerializableToolDef, ToolCall } from '../core/types'
+import type { SerializableToolDef } from '../core/types'
 import { registerTools, resolveModelContext, type ModelContextTool } from '../core/webmcp'
 import { ConfirmDialog } from './Confirm'
+import {
+  currentConfirmation,
+  dequeueConfirmation,
+  enqueueConfirmation,
+  subscribeToConfirmations,
+  type PendingConfirmation,
+} from './confirmations'
 import { AgentToolsContext } from './context'
 
 export interface AgentToolsRegistration {
@@ -14,35 +21,33 @@ export interface AgentToolsRegistration {
   recoverError?: ((error: unknown) => AgentResult<unknown> | undefined) | undefined
 }
 
-interface PendingConfirmation {
-  call: ToolCall
-  tool: SerializableToolDef
-  settle: (accepted: boolean) => void
-}
+const noConfirmation = () => undefined
 
 export function useAgentTools(tools: readonly SerializableToolDef[], registration: AgentToolsRegistration): ReactNode {
   const { polyfill = false, exposedTo, recoverError } = registration
   const hooks = useContext(AgentToolsContext)
-  const [pending, setPending] = useState<readonly PendingConfirmation[]>([])
+  const [owner] = useState(() => ({}))
+  const current = useSyncExternalStore(subscribeToConfirmations, currentConfirmation, noConfirmation)
   const unsettled = useRef(new Set<PendingConfirmation>())
 
   const confirm = useCallback<ToolRuntime['confirm']>(
     (call, tool, signal) =>
       new Promise<boolean>((resolve) => {
         const confirmation: PendingConfirmation = {
+          owner,
           call,
           tool,
           settle: (accepted) => {
-            unsettled.current.delete(confirmation)
-            setPending((queue) => queue.filter((entry) => entry !== confirmation))
+            if (!unsettled.current.delete(confirmation)) return
+            dequeueConfirmation(confirmation)
             resolve(accepted)
           },
         }
         unsettled.current.add(confirmation)
         signal.addEventListener('abort', () => confirmation.settle(false), { once: true })
-        setPending((queue) => [...queue, confirmation])
+        enqueueConfirmation(confirmation)
       }),
-    [],
+    [owner],
   )
 
   const latest = useRef({ tools, hooks, recoverError })
@@ -63,14 +68,14 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
       ({ action: _action, confirm: _confirm, adapter: _adapter, ...definition }, index): ModelContextTool => ({
         ...definition,
         execute: (input, options) => {
-          const current = latest.current
-          const tool = current.tools[index]
+          const state = latest.current
+          const tool = state.tools[index]
           if (!tool) throw new DOMException('The tool is no longer registered.', 'InvalidStateError')
           return executeTool(tool, input, options.signal, {
             confirm,
-            onBeforeExecute: current.hooks.onBeforeExecute,
-            onAfterExecute: current.hooks.onAfterExecute,
-            recoverError: current.recoverError,
+            onBeforeExecute: state.hooks.onBeforeExecute,
+            onAfterExecute: state.hooks.onAfterExecute,
+            recoverError: state.recoverError,
           })
         },
       }),
@@ -97,8 +102,7 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
     }
   }, [])
 
-  const current = pending[0]
-  if (!current) return null
+  if (current?.owner !== owner) return null
   const Confirm = hooks.confirmComponent ?? ConfirmDialog
   return (
     <Confirm

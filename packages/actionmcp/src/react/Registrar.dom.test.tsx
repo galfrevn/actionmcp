@@ -192,6 +192,45 @@ describe('Registrar', () => {
     await expect(second).resolves.toMatchObject({ ok: false })
   })
 
+  it('shows one confirmation at a time across two registrars', async () => {
+    await render(
+      <>
+        <Registrar tools={[createTool()]} />
+        <AgentToolsProvider confirmLabels={{ allow: 'Permitir' }}>
+          <Registrar tools={[createTool({ name: 'removeMember' })]} />
+        </AgentToolsProvider>
+      </>,
+    )
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    expect(document.querySelectorAll('dialog')).toHaveLength(1)
+    expect(document.querySelector('dialog')?.textContent).toContain('deleteAccount')
+    await act(async () => button('Allow').click())
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(document.querySelectorAll('dialog')).toHaveLength(1)
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    await act(async () => button('Permitir').click())
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(document.querySelector('dialog')).toBeNull()
+  })
+
+  it('shows the next confirmation of another registrar when the first one unmounts', async () => {
+    const Page = ({ withFirst }: { withFirst: boolean }) => (
+      <>
+        {withFirst ? <Registrar tools={[createTool()]} /> : null}
+        <Registrar tools={[createTool({ name: 'removeMember' })]} />
+      </>
+    )
+    await render(<Page withFirst />)
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    await render(<Page withFirst={false} />)
+    await expect(first).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    await act(async () => button('Cancel').click())
+    await expect(second).resolves.toMatchObject({ ok: false, error: { code: 'declined' } })
+  })
+
   it('runs a read-only tool without a dialog', async () => {
     const tool = createTool({
       name: 'listTodos',
