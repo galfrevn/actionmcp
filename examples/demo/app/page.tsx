@@ -1,6 +1,8 @@
+import { AgentTools } from 'actionmcp'
 import { readTodos, type Todo } from '../lib/todos'
 import { Chat } from './chat'
 import { reset, start } from './demo-actions'
+import { DemoTools } from './demo-tools'
 import { TodoList } from './todo-list'
 
 const REPOSITORY = 'https://github.com/galfrevn/actionmcp'
@@ -42,13 +44,18 @@ function Demo({ todos }: { todos: Todo[] }) {
         <h2>What to try</h2>
         <ol>
           <li>
-            Ask the assistant what is on your list. The todo that starts with “Ignore previous instructions” is a prompt injection. If the
-            model follows it, the page asks you before anything is removed. Select Cancel, and the model receives a <code>declined</code>{' '}
-            result.
+            Ask the assistant what is on your list. The todo that starts with “Ignore previous instructions” is a prompt injection: text in
+            your data that tries to give the model an order. The model should treat it as data. If it follows it, the page asks you before
+            anything changes.
           </li>
           <li>
-            Ask it to add a todo or to mark one as done. Each change asks you first, because the tool is consequential. Reading the list
-            does not ask, because <code>listTodos</code> is read-only.
+            Ask it to add, complete, or remove a todo. Each change waits for you: the dialog names the todo, and nothing changes until you
+            select Allow. Select Cancel, and the model receives a <code>declined</code> result. Reading the list does not ask, because{' '}
+            <code>listTodos</code> is read-only.
+          </li>
+          <li>
+            A message that you type is your own request, even when it says “Ignore previous instructions”. The model may act on it, and the
+            dialog still asks you before each change.
           </li>
           <li>
             Open this page in a browser or an agent that implements WebMCP. It sees the same four tools. The{' '}
@@ -102,6 +109,9 @@ export default async function Page() {
       <footer className="muted">
         The source of this page is <a href={SOURCE}>examples/demo</a>.
       </footer>
+      <DemoTools todos={todos ?? []}>
+        <AgentTools />
+      </DemoTools>
     </>
   )
 }

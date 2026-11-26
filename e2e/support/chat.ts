@@ -13,7 +13,7 @@ function streamBody(chunks: StreamChunk[]): string {
 
 export function toolCall(toolName: string, input: Record<string, unknown>): StreamChunk[] {
   return [
-    { type: 'start', messageId: `message-${toolName}` },
+    { type: 'start' },
     { type: 'start-step' },
     { type: 'tool-input-available', toolCallId: `call-${toolName}`, toolName, input, dynamic: true },
     { type: 'finish-step' },
@@ -23,7 +23,7 @@ export function toolCall(toolName: string, input: Record<string, unknown>): Stre
 
 export function reply(text: string): StreamChunk[] {
   return [
-    { type: 'start', messageId: 'message-reply' },
+    { type: 'start' },
     { type: 'start-step' },
     { type: 'text-start', id: 'text-1' },
     { type: 'text-delta', id: 'text-1', delta: text },

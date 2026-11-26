@@ -5,6 +5,19 @@ import { usePageToolsChat } from './use-page-tools-chat'
 
 const SUGGESTIONS = ['What is on my list?', 'Add "Water the plants"', 'Mark "Buy coffee beans" as done']
 
+function outcome(state: string, output: unknown): string {
+  if (state === 'output-error') return 'error'
+  if (state !== 'output-available') return 'waiting'
+  try {
+    const { content } = output as { content: Array<{ text?: unknown }> }
+    const text = content.find((item) => typeof item.text === 'string')?.text
+    const result = JSON.parse(String(text)) as { ok?: unknown; error?: { code?: unknown } }
+    return result.ok === false ? String(result.error?.code ?? 'failed') : 'done'
+  } catch {
+    return 'done'
+  }
+}
+
 export function Chat() {
   const { messages, sendMessage, status, error, ready, setupError } = usePageToolsChat('/api/chat')
   const [input, setInput] = useState('')
@@ -32,9 +45,10 @@ export function Chat() {
               )
             }
             if (part.type === 'dynamic-tool') {
+              const result = outcome(part.state, part.state === 'output-available' ? part.output : undefined)
               return (
-                <p key={key} className="tool" data-tool={part.toolName} data-state={part.state}>
-                  {part.toolName} · {part.state}
+                <p key={key} className="tool" data-tool={part.toolName} data-state={part.state} data-outcome={result}>
+                  {part.toolName} · {result}
                 </p>
               )
             }
