@@ -29,7 +29,7 @@
     "oxfmt": "0.80.0",
     "oxlint": "^1.95.0",
     "turbo": "^2.11.13",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^5.0.0",
     "webmcp-types": "^0.2.0"
   }
