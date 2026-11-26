@@ -56,8 +56,8 @@ describe.each(FIXTURES)('fixture $name', (fixture) => {
   describe.each(BUNDLERS)('next build with %s', (bundler) => {
     it('builds, generates the registry, and resolves the alias', async () => {
       const build = await nextBuild(fixturePath(fixture.name), bundler)
+      expect(build.code, build.output).toBe(0)
       expect(build.output).not.toMatch(/Module not found|Failed to compile/)
-      expect(build.code).toBe(0)
 
       const registry = readFileSync(fixturePath(fixture.name, '.agent-tools/registry.ts'), 'utf8')
       await expect(registry).toMatchFileSnapshot(`./__snapshots__/${fixture.name}.registry.snap`)
