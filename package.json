@@ -8,12 +8,14 @@
   },
   "scripts": {
     "build": "turbo run build --filter=actionmcp",
+    "build:fixtures": "turbo run build --filter='./fixtures/*'",
+    "build:examples": "turbo run build --filter='./examples/*'",
     "test": "turbo run test --filter=actionmcp",
-    "typecheck": "turbo run typecheck",
-    "lint": "oxlint --deny-warnings",
     "test:integration": "vitest run --config tests/integration/vitest.config.ts",
     "test:e2e": "playwright test --project=polyfill",
     "test:e2e:native": "playwright test --project=native",
+    "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit",
+    "lint": "oxlint --deny-warnings",
     "bench": "node bench/run.ts"
   },
   "devDependencies": {
@@ -23,6 +25,7 @@
     "oxlint": "^1.95.0",
     "turbo": "^2.11.13",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "webmcp-types": "^0.2.0"
   }
 }
