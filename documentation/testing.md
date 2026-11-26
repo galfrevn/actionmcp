@@ -40,7 +40,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 
 ## Quality criteria
 
-- At least 85% coverage in `core/`, `server/`, and `generator/`, enforced by the Vitest thresholds.
+- At least 85% coverage in each of `core/`, `server/`, `generator/`, `analyzer/`, `cli/`, `react/`, and `next/`, enforced by the Vitest thresholds.
 - Each diagnostic code has at least one positive and one negative test.
 - A snapshot of the generated `registry.ts` for each fixture, in `tests/integration/__snapshots__`.
 - Budgets, enforced by tests:
