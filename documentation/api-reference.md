@@ -192,13 +192,14 @@ The labels are plain strings, so a Server Component can pass translated text.
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
+| `cwd` | `string` | the directory where `next` runs | The directory of the Next.js project. A relative path is resolved from the directory where `next` runs. Set it when you run `next build apps/web` from another directory, because Next.js does not pass the project directory to `next.config`. The CLI ignores it and uses `--cwd`. |
 | `registry` | `string` | `./agent-tools.ts` if it exists | The explicit registry file. |
 | `scan` | `string[]` | `['app/**', 'lib/**', 'src/**']` | Globs to scan for `agent()` and `@agent`. A tool in a file outside these globs is not registered and produces `AT110`. |
 | `outDir` | `string` | `.agent-tools` | Where the registry and the manifest are written. |
 | `jsdoc` | `boolean` | `false` | Enables the experimental `@agent` path. |
 | `auth` | `string[]` | common names such as `auth` and `requireUser` | Function names that count as an auth check for `AT105`. |
 
-`nextConfig` can be an object or a function. During `next build`, an `AT0xx` error stops the build with the file and the line.
+`nextConfig` can be an object or a function. During `next build` and `next dev`, `withAgentTools()` warns when the project directory has no `app` or `src/app` directory. During `next build`, an `AT0xx` error stops the build with the file and the line.
 
 ## The `@agent` tag (experimental)
 

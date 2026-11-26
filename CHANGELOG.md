@@ -12,6 +12,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - In development, `<AgentTools />` logs each tool that the browser refuses to register, with the error. Before, a refused registration left no trace.
 - `<AgentTools />` checks each `exposedTo` origin. An origin that the browser would refuse, such as `agent.example` without a scheme, throws in development and is left out with a warning in production. Before, the browser refused every tool of that `<AgentTools />` and nothing was logged.
 - In development, the warning for a taken tool name says when two `<AgentTools />` on the page register the same tool, and suggests `include` or `exclude`.
+- The `cwd` option of `withAgentTools()`, for `next build apps/web` and other runs from outside the project directory. `withAgentTools()` warns when the project directory has no `app` or `src/app` directory. Before, such a run analyzed the directory where `next` ran and found no tools, with no message.
 
 ### Changed
 

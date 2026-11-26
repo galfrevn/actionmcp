@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 export interface AgentToolsConfig {
+  cwd?: string
   registry?: string
   scan?: string[]
   outDir?: string

@@ -100,6 +100,24 @@ describe('withAgentTools', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('AT103'))
   })
 
+  it('analyzes the project in the cwd option, relative to the directory where next runs', async () => {
+    project = createProject({ 'apps/web/app/actions.ts': ACTIONS })
+    vi.spyOn(process, 'cwd').mockReturnValue(project.cwd)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = await withAgentTools({ cwd: 'apps/web' })<NextConfig>({})('phase-production-build', context)
+    expect(readFileSync(join(project.cwd, 'apps/web/.agent-tools/registry.ts'), 'utf8')).toContain('ping: m0.ping')
+    expect(result.turbopack?.resolveAlias?.[REGISTRY_ALIAS]).toBe('./.agent-tools/registry.ts')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('warns when the directory has no app directory', async () => {
+    project = createProject({ 'apps/web/app/actions.ts': ACTIONS })
+    vi.spyOn(process, 'cwd').mockReturnValue(project.cwd)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await withAgentTools()({})('phase-production-build', context)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('has no app or src/app directory'))
+  })
+
   it('does not generate in other phases', async () => {
     const cwd = enter({ 'app/actions.ts': ACTIONS })
     const result = await withAgentTools()<NextConfig>({})('phase-production-server', context)
