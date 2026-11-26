@@ -42,7 +42,7 @@ Run the benchmark. It needs `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY`, from t
 
 ```bash
 echo 'OPENROUTER_API_KEY=your-key' > .env
-pnpm bench -- --model anthropic/claude-sonnet-5.5 --runs 20
+pnpm bench --model anthropic/claude-sonnet-5.5 --runs 20
 pnpm --filter actionmcp-bench summarize bench/results/<date>
 ```
 
