@@ -22,3 +22,6 @@ next-env.d.ts
 *.tsbuildinfo
 test-results/
 playwright-report/
+
+# Temporary projects created by the integration tests
+tests/integration/.tmp/
