@@ -109,6 +109,11 @@ export const DIAGNOSTIC_RULES = {
     summary: 'Explicit tool without an input schema',
     fix: "Move the action's schema out of the 'use server' file into a regular module and pass it as `input`.",
   },
+  AT206: {
+    level: 'error',
+    summary: 'The @agent path needs ts-json-schema-generator',
+    fix: 'Install it as a development dependency: npm install --save-dev ts-json-schema-generator.',
+  },
 } as const satisfies Record<string, DiagnosticRule>
 
 export type DiagnosticCode = keyof typeof DIAGNOSTIC_RULES

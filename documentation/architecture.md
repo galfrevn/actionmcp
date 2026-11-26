@@ -8,7 +8,7 @@ actionmcp has two halves. A build step finds the tools and writes a registry. A 
  │  analyzer                                     │   │  <AgentTools/>  (Server Component)                   │
  │  ├─ scan (oxc-parser): 'use server', exports, │   │  ├─ imports the registry (alias actionmcp/registry   │
  │  │   agent(), @agent JSDoc, app/ routes       │   │  │   → .agent-tools/registry.ts)                     │
- │  ├─ types (TypeScript 6): only for @agent     │   │  ├─ resolves each input schema to JSON Schema        │
+ │  ├─ types (TypeScript): only for @agent       │   │  ├─ resolves each input schema to JSON Schema        │
  │  └─ diagnostics ATxxx                         │   │  ├─ filters with include / exclude / prefix          │
  │  generator                                    │   │  └─ passes definitions + Server Function references  │
  │  ├─ .agent-tools/registry.ts  (server-only)   │   │                     │                                │
@@ -61,7 +61,7 @@ Input: the `withAgentTools()` options. Output: the list of tools, the route tabl
 
 An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
 
-For `@agent` tools, the analyzer creates a TypeScript program with its own TypeScript 6 and the project's `tsconfig.json`. `ts-json-schema-generator` produces the schema of the first parameter, with property descriptions from the JSDoc of each property. The result is cached in `.agent-tools/cache/types.json` by a hash of the file content and the `tsconfig`. A change in a type that another file declares does not invalidate the cache. Delete the cache file in that case.
+For `@agent` tools, the analyzer loads `ts-json-schema-generator` from the project, and the TypeScript that the generator resolves. It creates a TypeScript program with the project's `tsconfig.json`. The generator produces the schema of the first parameter, with property descriptions from the JSDoc of each property. If the generator is not installed, the analyzer reports `AT206` and the `@agent` tools are left out of the registry. The result is cached in `.agent-tools/cache/types.json` by a hash of the file content and the `tsconfig`. A change in a type that another file declares does not invalidate the cache. Delete the cache file in that case.
 
 Every diagnostic has a code, a file, a line, a column, and a suggested fix. The codes are in the [API reference](api-reference.md#diagnostics).
 
@@ -222,7 +222,7 @@ The registry needs a view of the whole project. Turbopack does not run webpack p
 
 `agent()` and `tool()` take the validator as a value. The JSON Schema comes from Standard JSON Schema at runtime on the server, and `agent()` validates with the same object, so the schema that the agent sees and the validation cannot drift apart. Any validator that implements the standard works, and actionmcp never parses validator source code. Zod 3 does not implement Standard JSON Schema.
 
-The `@agent` tag infers the schema from TypeScript types instead and does not validate at runtime. It is experimental and off by default.
+The `@agent` tag infers the schema from TypeScript types instead and does not validate at runtime. It is experimental and off by default. `ts-json-schema-generator` is an optional peer dependency, so an app that does not use the tag does not install TypeScript tooling for it.
 
 ### Opt-in exposure
 

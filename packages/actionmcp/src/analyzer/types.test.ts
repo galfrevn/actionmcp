@@ -16,14 +16,14 @@ afterEach(() => {
 async function infer(code: string, parameter: string, files: Record<string, string> = {}): Promise<TypeInference> {
   project = createProject({ 'tsconfig.json': TSCONFIG, 'app/actions.ts': code, ...files })
   const file = join(project.cwd, 'app/actions.ts')
-  const [inference] = await inferParameterSchemas([{ file, parameterOffset: code.indexOf(parameter) }], { cwd: project.cwd })
+  const [inference] = inferParameterSchemas([{ file, parameterOffset: code.indexOf(parameter) }], { cwd: project.cwd })
   if (!inference) throw new Error('No inference')
   return inference
 }
 
 describe('inferParameterSchemas', () => {
   it('returns nothing for no targets', async () => {
-    await expect(inferParameterSchemas([], { cwd: process.cwd() })).resolves.toEqual([])
+    expect(inferParameterSchemas([], { cwd: process.cwd() })).toEqual([])
   })
 
   it('infers required and optional fields from an inline type', async () => {
@@ -95,7 +95,7 @@ export const search = async (filters: Filters) => filters
     const code = `export async function get(input: { id: string }) { return input }\n`
     project = createProject({ 'tsconfig.json': TSCONFIG, 'app/actions.ts': code })
     const file = join(project.cwd, 'app/actions.ts')
-    await expect(inferParameterSchemas([{ file, parameterOffset: 3 }], { cwd: project.cwd })).resolves.toEqual([
+    expect(inferParameterSchemas([{ file, parameterOffset: 3 }], { cwd: project.cwd })).toEqual([
       { ok: false, reason: 'the first parameter has no type annotation' },
     ])
   })
@@ -104,7 +104,7 @@ export const search = async (filters: Filters) => filters
     const code = `export async function get(input: { id: number }) { return input }\n`
     project = createProject({ 'app/actions.ts': code })
     const file = join(project.cwd, 'app/actions.ts')
-    const [inference] = await inferParameterSchemas([{ file, parameterOffset: code.indexOf('input:') }], { cwd: project.cwd })
+    const [inference] = inferParameterSchemas([{ file, parameterOffset: code.indexOf('input:') }], { cwd: project.cwd })
     expect(inference).toMatchObject({ ok: true, schema: { properties: { id: { type: 'number' } } } })
   })
 
@@ -115,18 +115,18 @@ export const search = async (filters: Filters) => filters
     const cacheFile = join(project.cwd, '.agent-tools/cache/types.json')
     const target = { file, parameterOffset: code.indexOf('input:') }
 
-    const [first] = await inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
+    const [first] = inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
     expect(existsSync(cacheFile)).toBe(true)
     const stored = readFileSync(cacheFile, 'utf8')
 
     const started = performance.now()
-    const [second] = await inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
+    const [second] = inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
     expect(performance.now() - started).toBeLessThan(50)
     expect(second).toEqual(first)
     expect(readFileSync(cacheFile, 'utf8')).toBe(stored)
 
     project.write('app/actions.ts', code.replace('id: number', 'id: string'))
-    const [third] = await inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
+    const [third] = inferParameterSchemas([target], { cwd: project.cwd, cacheFile })
     expect(third).toMatchObject({ ok: true, schema: { properties: { id: { type: 'string' } } } })
   })
 
@@ -135,7 +135,7 @@ export const search = async (filters: Filters) => filters
     project = createProject({ 'tsconfig.json': TSCONFIG, 'app/actions.ts': code, '.agent-tools/cache/types.json': 'not json' })
     const file = join(project.cwd, 'app/actions.ts')
     const cacheFile = join(project.cwd, '.agent-tools/cache/types.json')
-    const [inference] = await inferParameterSchemas([{ file, parameterOffset: code.indexOf('input:') }], { cwd: project.cwd, cacheFile })
+    const [inference] = inferParameterSchemas([{ file, parameterOffset: code.indexOf('input:') }], { cwd: project.cwd, cacheFile })
     expect(inference?.ok).toBe(true)
   })
 })

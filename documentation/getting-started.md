@@ -9,6 +9,7 @@ The [examples](../examples) show the result of each step.
 - Next.js 16.x and React 19.2 or later.
 - A validator that implements Standard JSON Schema: Zod 4.2 or later, ArkType 2.1.28 or later, or Valibot 1.2 or later with `@valibot/to-json-schema`.
 - Node.js 22.18 or later.
+- For the experimental `@agent` tag only: `ts-json-schema-generator` as a development dependency.
 
 ## 1. Install
 

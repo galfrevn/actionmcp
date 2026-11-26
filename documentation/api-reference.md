@@ -176,7 +176,13 @@ export async function renameTask(input: { taskId: string; title: string }) {
 }
 ```
 
-Enable it with `jsdoc: true`. The description is the comment text before the first tag. The input schema is inferred from the type of the first parameter. actionmcp does not validate the input at runtime, so the function validates it.
+Enable it with `jsdoc: true`, and install `ts-json-schema-generator` as a development dependency:
+
+```bash
+npm install --save-dev ts-json-schema-generator
+```
+
+The description is the comment text before the first tag. The input schema is inferred from the type of the first parameter. actionmcp does not validate the input at runtime, so the function validates it.
 
 | Modifier | Effect |
 |---|---|
@@ -233,6 +239,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT203` | warn | A validator without Standard JSON Schema support is installed (`doctor`) |
 | `AT204` | warn | The origin trial token is not set (`doctor`) |
 | `AT205` | warn | An adapted action is registered without an `input` schema |
+| `AT206` | error | `jsdoc` is enabled and a tool needs an inferred schema, but `ts-json-schema-generator` is not installed |
 
 `AT102` and `AT105` to `AT107` are heuristics over the source code.
 
