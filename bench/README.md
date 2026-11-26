@@ -9,7 +9,8 @@ The harness and the demo app are in this folder. A run needs a model key.
 - **App:** `bench/app`, a team and account app with a JSON file as its database. The seed has 30 members and is the same before every run.
 - **Harness:** [agent-browser](https://github.com/vercel-labs/agent-browser) 0.44.0, the same binary in both modes.
   - `clicks`: agent-browser runs with `--no-webmcp`. The agent has `snapshot`, `open`, `click`, `fill`, `select`, and `press`.
-  - `webmcp`: the agent has the same tools plus `webmcp_list` and `webmcp_invoke`.
+  - `webmcp`: the agent has the same tools plus `webmcp_list` and `webmcp_invoke`. `webmcp_list` returns the name, the description, the input schema, and the annotations of each tool. `webmcp_invoke` returns the output of the tool. The harness removes the frame, origin, and process fields that agent-browser adds to both answers, because they do not come from the page.
+  - Every tool answer is cut at 8,000 characters in both modes.
 - **Model:** one model through OpenRouter or the Vercel AI Gateway, with `temperature: 0`. Both use the same model identifiers, such as `anthropic/claude-sonnet-5.5`.
 - **Tasks:** the five tasks in `lib/tasks.ts`.
 - **Success:** each task has a verifier that reads the database after the run. The agent's answer decides only the read-only task, where the verifier compares it with the owners in the database.
@@ -46,7 +47,7 @@ pnpm bench --model anthropic/claude-sonnet-5.5 --runs 20
 pnpm --filter actionmcp-bench summarize bench/results/<date>
 ```
 
-`run.ts` appends one JSON line per run to `bench/results/<date>/runs.jsonl`. The first line records the model, the provider, the harness commit, and the versions of Node.js, agent-browser, and Next.js. `summarize.ts` writes `summary.md` and `chart.svg` next to it.
+`run.ts` appends one JSON line per run to `bench/results/<date>/runs.jsonl`. The first line records the model, the provider, the harness commit, whether `bench/` or the package source had uncommitted changes, and the versions of Node.js, agent-browser, and Next.js. `summarize.ts` writes `summary.md` and `chart.svg` next to it.
 
 Options: `--model`, `--runs`, `--tasks invite-member,composite`, `--modes clicks,webmcp`, and `--out <directory>`.
 

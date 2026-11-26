@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 export interface BrowserOptions {
   session: string
@@ -11,20 +12,14 @@ export interface CommandResult {
 }
 
 const COMMAND_TIMEOUT_MS = 60_000
-const MAX_OUTPUT_CHARACTERS = 8000
+const BINARY = fileURLToPath(new URL('../node_modules/.bin/agent-browser', import.meta.url))
 
 export function browser(options: BrowserOptions, args: readonly string[]): Promise<CommandResult> {
   const flags = ['--session', options.session, ...(options.webmcp ? [] : ['--no-webmcp'])]
   return new Promise((resolve) => {
-    execFile(
-      'pnpm',
-      ['exec', 'agent-browser', ...flags, ...args],
-      { timeout: COMMAND_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        const output = `${stdout}${error ? `\n${stderr || error.message}` : ''}`.trim()
-        resolve({ ok: !error, output: output.slice(0, MAX_OUTPUT_CHARACTERS) })
-      },
-    )
+    execFile(BINARY, [...flags, ...args], { timeout: COMMAND_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+      resolve({ ok: !error, output: `${stdout}${error ? `\n${stderr || error.message}` : ''}`.trim() })
+    })
   })
 }
 

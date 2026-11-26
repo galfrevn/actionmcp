@@ -46,6 +46,7 @@ const environment = {
   provider: resolved.provider,
   maxSteps: MAX_STEPS,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  dirty: execFileSync('git', ['status', '--porcelain', '--', 'bench', 'packages/actionmcp/src'], { encoding: 'utf8' }).trim() !== '',
   node: process.version,
   agentBrowser: version(['exec', 'agent-browser', '--version']),
   next: version(['--filter', 'bench-app', 'exec', 'next', '--version']),
