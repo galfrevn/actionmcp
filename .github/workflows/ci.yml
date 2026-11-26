@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  check:
+    name: Lint, types, and unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ matrix.node }}
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  integration:
+    name: next build over fixtures (Next ${{ matrix.next }}, React ${{ matrix.react }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - next: '16.4.6'
+            react: '19.3.1'
+          - next: '16.2.12'
+            react: '19.2.9'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Pin the framework versions of the fixtures
+        if: matrix.next != '16.4.6'
+        run: pnpm --filter './fixtures/*' add next@${{ matrix.next }} react@${{ matrix.react }} react-dom@${{ matrix.react }}
+      - run: pnpm build
+      - run: pnpm test:integration
+
+  e2e:
+    name: End-to-end (polyfill and native WebMCP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+      - run: pnpm build:fixtures
+      - run: pnpm build:examples
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - run: pnpm test:e2e:native
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results
+          retention-days: 7
+
+  package:
+    name: Packed tarball in an npm project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+      - run: pnpm test:package

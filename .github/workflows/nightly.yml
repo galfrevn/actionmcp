@@ -1,0 +1,35 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  canary:
+    name: Next.js canary (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Install Next.js canary in the fixtures
+        run: pnpm --filter './fixtures/*' add next@canary react@latest react-dom@latest
+      - run: pnpm build
+      - run: pnpm test:integration
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build:examples
+      - run: pnpm test:e2e
+      - run: pnpm test:e2e:native
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: nightly-playwright-traces
+          path: test-results
+          retention-days: 7

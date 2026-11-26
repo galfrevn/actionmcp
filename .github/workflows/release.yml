@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist-tag:
+        description: npm dist-tag
+        default: latest
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish actionmcp to npm
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:package
+      - run: pnpm publish --provenance --access public --tag ${{ inputs.dist-tag }} --no-git-checks
+        working-directory: packages/actionmcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
