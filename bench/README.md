@@ -56,6 +56,27 @@ The confirmation dialog needs a human click, so a benchmark run cannot pass it. 
 
 The `clicks` mode shows no dialog, because the UI forms call the actions directly. This asymmetry is part of the result and must be reported with it.
 
+## Results
+
+One run exists so far: [`results/2026-11-26`](results/2026-11-26/summary.md), with `anthropic/claude-sonnet-5.5` through OpenRouter, 20 runs per task and mode, 200 runs in total. The raw log is [`runs.jsonl`](results/2026-11-26/runs.jsonl).
+
+| Task | Success, clicks | Success, WebMCP | Median tokens, clicks | Median tokens, WebMCP | Median time, clicks | Median time, WebMCP |
+|---|---|---|---|---|---|---|
+| `invite-member` | 20/20 | 20/20 | 29,903 | 8,004 | 9.1 s | 4.3 s |
+| `rename-account` | 20/20 | 20/20 | 18,339 | 7,973 | 10.8 s | 4.0 s |
+| `remove-member` | 20/20 | 20/20 | 17,003 | 14,202 | 5.2 s | 5.6 s |
+| `list-owners` | 20/20 | 20/20 | 6,273 | 9,201 | 3.0 s | 3.8 s |
+| `composite` | 17/20 | 20/20 | 187,717 | 16,355 | 27.4 s | 7.5 s |
+
+What the run shows, for this app and this model:
+
+- On the two single-step mutations and on the composite task, the WebMCP mode used between 2.3 and 11.5 times fewer tokens and was between 2.1 and 3.6 times faster at the median.
+- On `remove-member` the two modes were close: 1.2 times fewer tokens with WebMCP, and a slightly longer median time.
+- On the read-only task `list-owners`, the clicks mode was cheaper and faster. One page snapshot answers the question, while the WebMCP mode lists the tools first and then calls one.
+- The three failures were all `composite` runs in the clicks mode. In each, the database had no invitation for `sam@example.com`.
+
+Read these numbers with the limits below. The run has not been repeated with a second model, and the machine also ran other light commands during the run, which can affect the times but not the token counts.
+
 ## Rules for publishing results
 
 - Publish `runs.jsonl` with every run, including the failed ones.

@@ -122,6 +122,10 @@ pnpm build
 pnpm --filter example-basic dev
 ```
 
+## Benchmark
+
+[`bench/`](bench/README.md) compares one agent that clicks through a demo app with the same agent calling the WebMCP tools. In the one run published so far, with one model and five tasks, the WebMCP mode used fewer tokens on four tasks and more on the read-only task. The [results](bench/README.md#results) include every run and the limits of the method.
+
 ## Documentation
 
 - [Getting started](documentation/getting-started.md)
