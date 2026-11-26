@@ -77,4 +77,19 @@ describe('buildHref', () => {
     expect(() => buildHref(routes, { route: '/projects/[id]', params: { id: '' } })).toThrow('Missing route parameter "id"')
     expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: '/' } })).toThrow('Missing route parameter "path"')
   })
+
+  it('rejects dot segments that would resolve to a route outside the allowed list', () => {
+    expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: '../admin' } })).toThrow(
+      'The route parameter "path" cannot contain the path segment "..".',
+    )
+    expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: 'guides/./../..' } })).toThrow('cannot contain the path segment "."')
+    expect(() => buildHref(routes, { route: '/projects/[id]', params: { id: '..' } })).toThrow('cannot contain the path segment ".."')
+    expect(() => buildHref(routes, { route: '/projects/[id]', params: { id: '.' } })).toThrow('cannot contain the path segment "."')
+    expect(() => buildHref(routes, { route: '/shop/[[...filters]]', params: { filters: '../todos' } })).toThrow('cannot contain the path segment ".."')
+  })
+
+  it('keeps dots inside a longer segment and encodes an encoded dot segment again', () => {
+    expect(buildHref(routes, { route: '/projects/[id]', params: { id: 'v1.2..3' } })).toBe('/projects/v1.2..3')
+    expect(buildHref(routes, { route: '/docs/[...path]', params: { path: '.../%2e%2e/file.md' } })).toBe('/docs/.../%252e%252e/file.md')
+  })
 })

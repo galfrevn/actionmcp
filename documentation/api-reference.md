@@ -122,7 +122,7 @@ In development, an invalid, reserved, or duplicate name throws. In production it
 
 ### The `navigate` tool
 
-Input: `{ route, params?, query? }`. `route` is one of the listed route patterns, such as `/projects/[id]`. `params` fills the dynamic segments, and a catch-all takes a path such as `guides/setup`. The tool calls `router.push()` and returns `{ ok: true, data: { url } }`. It needs no confirmation.
+Input: `{ route, params?, query? }`. `route` is one of the listed route patterns, such as `/projects/[id]`. `params` fills the dynamic segments, and a catch-all takes a path such as `guides/setup`. The tool calls `router.push()` and returns `{ ok: true, data: { url } }`. It needs no confirmation. A parameter that contains the path segment `.` or `..` returns an `invalid_input` result.
 
 - `navigate` lists routes without dynamic segments and dynamic routes whose page exports `generateStaticParams`.
 - `navigate={{ routes: ['/projects/*', '/docs/**'] }}` lists the routes whose pattern matches a glob. `*` stays inside one segment and `**` crosses segments.

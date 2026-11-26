@@ -23,7 +23,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 | `safe-action` | `fromSafeAction`: `serverError`, `validationErrors`, `data` |
 | `jsdoc` | `@agent`: optional fields, enums, unions, per-property JSDoc; an untagged export stays private |
 | `scoped` | `include`, `exclude`, and `prefix` in segment layouts; navigation changes the tools and emits `toolchange` |
-| `navigate` | Static and dynamic routes, route groups, excluded folders, `routes` globs |
+| `navigate` | Static and dynamic routes, route groups, excluded folders, `routes` globs, rejected `..` parameters |
 | `redirect` | An action that calls `redirect()`, from the root layout and from a segment that unmounts |
 | `hostile` | Output with injected instructions; the confirmation blocks execution; one RPC request per call |
 | `coexist` | Tools from other libraries on the same page, a taken name, and an app-installed polyfill |
