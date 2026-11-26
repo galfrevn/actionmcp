@@ -9,6 +9,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The `AT008` error for a plain function that the registry file lists by reference. Before, `inspect` reported it as a valid tool and the app failed when it rendered.
 - The `AT110` warning for an exported `agent()` or `@agent` tool in a file that the `scan` globs do not cover. Before, the tool was left out with no message.
 - `agent()` logs the issues on the server when the return value of a handler does not match the `output` schema.
+- In development, `<AgentTools />` logs each tool that the browser refuses to register, with the error. Before, a refused registration left no trace.
 
 ### Changed
 

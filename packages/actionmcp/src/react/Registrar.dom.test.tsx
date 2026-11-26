@@ -106,6 +106,14 @@ describe('Registrar', () => {
     })
   })
 
+  it('logs a tool that the browser rejects in development', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await render(<Registrar tools={[createTool({ name: 'bad name' }), createTool()]} />)
+    expect(await toolNames()).toEqual(['deleteAccount'])
+    expect(logged).toHaveBeenCalledWith('actionmcp: the browser rejected the tool "bad name".', expect.any(DOMException))
+    logged.mockRestore()
+  })
+
   it('keeps the registration when the same definitions render again', async () => {
     const onChange = vi.fn()
     await render(<Registrar tools={[createTool()]} />)

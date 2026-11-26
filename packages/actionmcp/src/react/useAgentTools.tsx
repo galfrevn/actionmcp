@@ -80,9 +80,9 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
         },
       }),
     )
-    void resolveModelContext(stable.polyfill, signal).then((context) => {
+    void resolveModelContext(stable.polyfill, signal).then(async (context) => {
       if (!context || signal.aborted) return
-      return registerTools(context, definitions, {
+      const results = await registerTools(context, definitions, {
         signal,
         exposedTo: stable.exposedTo,
         onCollision: (requested, registered) => {
@@ -91,6 +91,13 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
           }
         },
       })
+      if (process.env.NODE_ENV !== 'production' && !signal.aborted) {
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.error(`actionmcp: the browser rejected the tool "${definitions[index]?.name}".`, result.reason)
+          }
+        })
+      }
     })
     return () => controller.abort()
   }, [stable, confirm])
