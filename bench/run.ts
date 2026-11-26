@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -7,6 +7,11 @@ import { MAX_STEPS, runAgent, type Mode } from './lib/agent.ts'
 import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser } from './lib/browser.ts'
 import { TASKS } from './lib/tasks.ts'
+
+const environmentFile = fileURLToPath(new URL('./.env.local', import.meta.url))
+if (existsSync(environmentFile)) {
+  process.loadEnvFile(environmentFile)
+}
 
 const { values } = parseArgs({
   options: {
@@ -19,7 +24,7 @@ const { values } = parseArgs({
 })
 
 if (!process.env.AI_GATEWAY_API_KEY) {
-  console.error('Set AI_GATEWAY_API_KEY to run the benchmark. See bench/README.md.')
+  console.error('Set AI_GATEWAY_API_KEY in the environment or in bench/.env.local to run the benchmark. See bench/README.md.')
   process.exit(1)
 }
 

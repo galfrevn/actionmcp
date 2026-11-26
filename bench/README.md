@@ -38,10 +38,11 @@ Check the harness without a model. The smoke script performs each task with scri
 pnpm bench:smoke
 ```
 
-Run the benchmark. It needs `AI_GATEWAY_API_KEY`:
+Run the benchmark. It needs `AI_GATEWAY_API_KEY`, from the environment or from `bench/.env.local`, which git ignores:
 
 ```bash
-AI_GATEWAY_API_KEY=... pnpm bench -- --model anthropic/claude-sonnet-5.5 --runs 20
+echo 'AI_GATEWAY_API_KEY=your-key' > bench/.env.local
+pnpm bench -- --model anthropic/claude-sonnet-5.5 --runs 20
 pnpm --filter actionmcp-bench summarize bench/results/<date>
 ```
 
