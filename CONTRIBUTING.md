@@ -79,7 +79,7 @@ To check a release without publishing, run the workflow by hand with `dry-run` e
 gh workflow run release.yml -f dry-run=true
 ```
 
-The workflow needs one secret in the `npm` environment: `NPM_TOKEN`, a granular npm access token with read and write access to `actionmcp`.
+The workflow holds no npm token. It publishes with [trusted publishing](https://docs.npmjs.com/trusted-publishers): npm accepts the OIDC token of the run. The settings of `actionmcp` on npmjs.com must list a trusted publisher with this repository, the workflow file `release.yml`, and the environment `npm`.
 
 ## License
 
