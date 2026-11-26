@@ -1,0 +1,187 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { subscribeToToolCalls, type ToolCallRecord } from './events'
+import { executeTool, requiresConfirmation, type ToolRuntime } from './execute'
+import { BLOCKED_MESSAGE, DECLINED_MESSAGE, GENERIC_FAILURE_MESSAGE, fail, succeed } from './result'
+import type { ConfirmPolicy, SerializableToolDef, ToolAnnotations } from './types'
+
+const readOnly: ToolAnnotations = { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false }
+const consequential: ToolAnnotations = { readOnlyHint: false, consequentialHint: true, untrustedContentHint: false }
+
+function createTool(overrides: Partial<SerializableToolDef> = {}): SerializableToolDef {
+  return {
+    name: 'deleteAccount',
+    description: 'Delete the account.',
+    annotations: consequential,
+    confirm: 'consequential',
+    action: vi.fn(async () => succeed({ deleted: true })),
+    ...overrides,
+  }
+}
+
+function createRuntime(overrides: Partial<ToolRuntime> = {}): ToolRuntime {
+  return { confirm: vi.fn(async () => true), ...overrides }
+}
+
+const neverAborted = () => new AbortController().signal
+
+describe('requiresConfirmation', () => {
+  it.each<[ConfirmPolicy, ToolAnnotations, boolean]>([
+    ['always', readOnly, true],
+    ['always', consequential, true],
+    ['consequential', readOnly, false],
+    ['consequential', consequential, true],
+    ['never', readOnly, false],
+    ['never', consequential, false],
+  ])('confirm=%s with %j requires confirmation: %s', (confirm, annotations, expected) => {
+    expect(requiresConfirmation({ confirm, annotations })).toBe(expected)
+  })
+})
+
+describe('executeTool', () => {
+  let unsubscribe = () => {}
+
+  afterEach(() => unsubscribe())
+
+  function recordCalls(): ToolCallRecord[] {
+    const records: ToolCallRecord[] = []
+    unsubscribe = subscribeToToolCalls((record) => records.push(record))
+    return records
+  }
+
+  it('runs a read-only tool without asking for confirmation', async () => {
+    const tool = createTool({ annotations: readOnly, action: vi.fn(async () => succeed(['a'])) })
+    const runtime = createRuntime()
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual({ ok: true, data: ['a'] })
+    expect(runtime.confirm).not.toHaveBeenCalled()
+  })
+
+  it('asks for confirmation before a consequential tool and then runs it', async () => {
+    const order: string[] = []
+    const tool = createTool({
+      action: vi.fn(async () => {
+        order.push('action')
+        return succeed(1)
+      }),
+    })
+    const runtime = createRuntime({
+      confirm: vi.fn(async () => {
+        order.push('confirm')
+        return true
+      }),
+    })
+    const input = { id: 'u1' }
+    await executeTool(tool, input, neverAborted(), runtime)
+    expect(order).toEqual(['confirm', 'action'])
+    expect(runtime.confirm).toHaveBeenCalledWith(
+      { name: 'deleteAccount', input, annotations: consequential, source: 'agent' },
+      tool,
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('does not run the action when the user declines', async () => {
+    const tool = createTool()
+    const runtime = createRuntime({ confirm: vi.fn(async () => false) })
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual(fail('declined', DECLINED_MESSAGE))
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('does not run the action until the confirmation settles', async () => {
+    const tool = createTool()
+    let accept: (accepted: boolean) => void = () => {}
+    const runtime = createRuntime({ confirm: () => new Promise<boolean>((resolve) => (accept = resolve)) })
+    let settled = false
+    const execution = executeTool(tool, {}, neverAborted(), runtime).then((output) => {
+      settled = true
+      return output
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(settled).toBe(false)
+    expect(tool.action).not.toHaveBeenCalled()
+    accept(true)
+    await expect(execution).resolves.toEqual({ ok: true, data: { deleted: true } })
+  })
+
+  it('does not run the action when onBeforeExecute returns false', async () => {
+    const tool = createTool({ confirm: 'never' })
+    const runtime = createRuntime({ onBeforeExecute: async () => false })
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual(fail('blocked', BLOCKED_MESSAGE))
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('reports the result to onAfterExecute', async () => {
+    const onAfterExecute = vi.fn()
+    const tool = createTool({ confirm: 'never' })
+    await executeTool(tool, { id: 1 }, neverAborted(), createRuntime({ onBeforeExecute: () => true, onAfterExecute }))
+    expect(onAfterExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'deleteAccount', input: { id: 1 } }), {
+      ok: true,
+      data: { deleted: true },
+    })
+  })
+
+  it('calls a FormData action with (undefined, FormData)', async () => {
+    const action = vi.fn(async (_previous: unknown, formData: FormData) => ({ success: `Invited ${String(formData.get('email'))}` }))
+    const tool = createTool({ adapter: 'formdata', confirm: 'never', action })
+    const output = await executeTool(tool, { email: 'ana@acme.com', notify: true }, neverAborted(), createRuntime())
+    expect(output).toEqual({ ok: true, data: { success: 'Invited ana@acme.com' } })
+    const [previous, formData] = action.mock.calls[0] ?? []
+    expect(previous).toBeUndefined()
+    expect(formData?.get('notify')).toBe('on')
+  })
+
+  it('unwraps a safe-action result', async () => {
+    const tool = createTool({ adapter: 'safe-action', confirm: 'never', action: async () => ({ data: { id: 3 } }) })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual({ ok: true, data: { id: 3 } })
+  })
+
+  it('returns a failure when the action throws', async () => {
+    const tool = createTool({ confirm: 'never', action: async () => Promise.reject(new Error('Network down')) })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(fail('failed', 'Network down'))
+  })
+
+  it('returns a generic failure when the action throws a non-error', async () => {
+    const tool = createTool({ confirm: 'never', action: async () => Promise.reject('nope') })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(
+      fail('failed', GENERIC_FAILURE_MESSAGE),
+    )
+  })
+
+  it('lets the runtime recover a thrown error', async () => {
+    const tool = createTool({ confirm: 'never', action: async () => Promise.reject(new Error('redirect')) })
+    const runtime = createRuntime({ recoverError: () => succeed({ navigatedTo: '/done' }) })
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual({ ok: true, data: { navigatedTo: '/done' } })
+  })
+
+  it('rejects with AbortError when the signal is already aborted', async () => {
+    const tool = createTool({ confirm: 'never' })
+    const controller = new AbortController()
+    controller.abort()
+    await expect(executeTool(tool, {}, controller.signal, createRuntime())).rejects.toMatchObject({ name: 'AbortError' })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('rejects with AbortError when the call is cancelled during confirmation', async () => {
+    const tool = createTool()
+    const controller = new AbortController()
+    const runtime = createRuntime({ confirm: () => new Promise<boolean>(() => {}) })
+    const execution = executeTool(tool, {}, controller.signal, runtime)
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(tool.action).not.toHaveBeenCalled()
+  })
+
+  it('publishes a record for each call', async () => {
+    const records = recordCalls()
+    await executeTool(createTool(), { id: 1 }, neverAborted(), createRuntime())
+    await executeTool(createTool(), {}, neverAborted(), createRuntime({ confirm: async () => false }))
+    const controller = new AbortController()
+    controller.abort()
+    await executeTool(createTool(), {}, controller.signal, createRuntime()).catch(() => undefined)
+    expect(records.map((record) => [record.name, record.confirmation, record.result])).toEqual([
+      ['deleteAccount', 'accepted', { ok: true, data: { deleted: true } }],
+      ['deleteAccount', 'declined', fail('declined', DECLINED_MESSAGE)],
+      ['deleteAccount', 'none', { aborted: true }],
+    ])
+    expect(records.every((record) => record.durationMs >= 0)).toBe(true)
+  })
+})
