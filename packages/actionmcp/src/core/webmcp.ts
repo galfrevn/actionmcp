@@ -34,11 +34,17 @@ export function getWebMCPStatus(): WebMCPStatus {
 }
 
 export function loadPolyfill(): Promise<ModelContext | undefined> {
-  pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(({ installWebMCP }) => {
-    installWebMCP()
-    announceAvailability()
-    return getModelContext()
-  })
+  pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(
+    ({ installWebMCP }) => {
+      installWebMCP()
+      announceAvailability()
+      return getModelContext()
+    },
+    (error: unknown) => {
+      pendingPolyfill = undefined
+      throw error
+    },
+  )
   return pendingPolyfill
 }
 

@@ -42,6 +42,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - An error of a file watcher in `next dev` or `actionmcp generate --watch`, such as `ENOSPC` or `EMFILE`, is reported and stops only that watcher. Before, it crashed the process.
 - In watch mode, a scan root such as `lib/` and a default registry file such as `agent-tools.ts` that are created after the start are watched and analyzed. Before, they needed a restart.
 - A tool in a `.mts` file is an `AT004` error that asks to rename the file to `.ts`. Next.js does not apply `'use server'` to `.mts` files, so before, the generated registry passed a plain function to the client and `next build` failed while prerendering.
+- A failed import of the polyfill is logged, and the next `<AgentTools />` that mounts loads it again. Before, the failure stayed cached until a reload and produced an unhandled promise rejection.
 
 ## 0.2.0
 

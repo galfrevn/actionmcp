@@ -106,23 +106,25 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
       claimNames(names, 1)
       warnInsecureContext()
     }
-    void resolveModelContext(stable.polyfill, signal).then(async (context) => {
-      if (!context || signal.aborted) return
-      const results = await registerTools(context, definitions, {
-        signal,
-        exposedTo: stable.exposedTo,
-        onCollision: (requested, registered) => {
-          if (process.env.NODE_ENV !== 'production') console.warn(describeCollision(requested, registered))
-        },
-      })
-      if (process.env.NODE_ENV !== 'production' && !signal.aborted) {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            console.error(`actionmcp: the browser rejected the tool "${definitions[index]?.name}".`, result.reason)
-          }
+    resolveModelContext(stable.polyfill, signal)
+      .then(async (context) => {
+        if (!context || signal.aborted) return
+        const results = await registerTools(context, definitions, {
+          signal,
+          exposedTo: stable.exposedTo,
+          onCollision: (requested, registered) => {
+            if (process.env.NODE_ENV !== 'production') console.warn(describeCollision(requested, registered))
+          },
         })
-      }
-    })
+        if (process.env.NODE_ENV !== 'production' && !signal.aborted) {
+          results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+              console.error(`actionmcp: the browser rejected the tool "${definitions[index]?.name}".`, result.reason)
+            }
+          })
+        }
+      })
+      .catch((error: unknown) => console.error('actionmcp: the tools could not be registered.', error))
     return () => {
       controller.abort()
       if (process.env.NODE_ENV !== 'production') claimNames(names, -1)
