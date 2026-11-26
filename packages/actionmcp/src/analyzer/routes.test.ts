@@ -1,6 +1,8 @@
+import { rmSync, utimesSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createProject, type TemporaryProject } from './__fixtures__/project'
-import { findAppDirectory, scanRoutes } from './routes'
+import { findAppDirectory, scanRoutes, type PageMetadataCache } from './routes'
 
 const PAGE = 'export default function Page() { return null }\n'
 
@@ -78,5 +80,38 @@ describe('scanRoutes', () => {
       { pattern: '/posts/[slug]', params: ['slug'], staticParams: true },
       { pattern: '/tags/[tag]', params: ['tag'], staticParams: true },
     ])
+  })
+
+  it('reuses the metadata of a page whose modification time and size did not change', () => {
+    project = createProject({ 'app/page.tsx': `export const metadata = { title: 'Home' }\n${PAGE}` })
+    const file = join(project.cwd, 'app/page.tsx')
+    const cache: PageMetadataCache = new Map()
+    const modified = new Date('2026-01-01T00:00:00Z')
+    utimesSync(file, modified, modified)
+    expect(scanRoutes(project.cwd, cache)).toEqual([{ pattern: '/', params: [], title: 'Home' }])
+
+    project.write('app/page.tsx', `export const metadata = { title: 'Away' }\n${PAGE}`)
+    utimesSync(file, modified, modified)
+    expect(scanRoutes(project.cwd, cache)).toEqual([{ pattern: '/', params: [], title: 'Home' }])
+    expect(scanRoutes(project.cwd)).toEqual([{ pattern: '/', params: [], title: 'Away' }])
+  })
+
+  it('refreshes a changed page and forgets a removed one', () => {
+    project = createProject({
+      'app/page.tsx': `export const metadata = { title: 'Home' }\n${PAGE}`,
+      'app/about/page.tsx': PAGE,
+    })
+    const cache: PageMetadataCache = new Map()
+    scanRoutes(project.cwd, cache)
+    expect(cache.size).toBe(2)
+
+    project.write('app/page.tsx', `export const metadata = { title: 'Start page' }\n${PAGE}`)
+    rmSync(join(project.cwd, 'app/about'), { recursive: true })
+    expect(scanRoutes(project.cwd, cache)).toEqual([{ pattern: '/', params: [], title: 'Start page' }])
+    expect([...cache.keys()]).toEqual([join(project.cwd, 'app/page.tsx')])
+
+    rmSync(join(project.cwd, 'app'), { recursive: true })
+    expect(scanRoutes(project.cwd, cache)).toEqual([])
+    expect(cache.size).toBe(0)
   })
 })

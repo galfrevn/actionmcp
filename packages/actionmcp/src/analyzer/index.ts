@@ -9,13 +9,14 @@ import type { ResolvedConfig } from './config'
 import { createDiagnostic, sortDiagnostics, type Diagnostic } from './diagnostics'
 import { scanRegistryModule, type ToolReference } from './explicit'
 import type { AnalysisResult, AnalyzedTool } from './model'
-import { scanRoutes } from './routes'
+import { scanRoutes, type PageMetadataCache } from './routes'
 import { mayContainTools, scanModule, type ModuleScan } from './scan'
 import { parseModule } from './source'
 import { inferParameterSchemas } from './types'
 
 export interface AnalysisCache {
   modules: Map<string, { stamp: string; scan: ModuleScan | undefined }>
+  pages: PageMetadataCache
 }
 
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mts|mjs)$/
@@ -23,15 +24,16 @@ const TYPES_CACHE_FILE = 'cache/types.json'
 const PACKAGE_MANIFEST = { file: 'package.json', line: 1, column: 1 }
 
 export function createAnalysisCache(): AnalysisCache {
-  return { modules: new Map() }
+  return { modules: new Map(), pages: new Map() }
 }
 
 export async function analyze(config: ResolvedConfig, cache: AnalysisCache = createAnalysisCache()): Promise<AnalysisResult> {
   const files = await listSourceFiles(config)
   const registryFile = config.registry ? toRelative(config.cwd, config.registry) : undefined
   const scans = files.filter((file) => file !== registryFile).flatMap((file) => scanFile(config, cache, file) ?? [])
+  const listed = new Set(files)
   for (const file of cache.modules.keys()) {
-    if (!files.includes(file)) cache.modules.delete(file)
+    if (!listed.has(file)) cache.modules.delete(file)
   }
 
   const tools = scans.flatMap((scan) => scan.tools)
@@ -45,7 +47,7 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
     diagnostics.push(...registry.diagnostics)
   }
 
-  const routes = scanRoutes(config.cwd)
+  const routes = scanRoutes(config.cwd, cache.pages)
   if (scans.some((scan) => scan.usesNavigate)) tools.push(navigateTool())
   diagnostics.push(...checkNames(tools), ...checkToolCount(tools))
 
