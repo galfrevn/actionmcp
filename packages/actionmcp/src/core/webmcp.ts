@@ -1,0 +1,96 @@
+import type { WebMCP } from 'webmcp-types'
+
+export type ModelContext = WebMCP.ModelContext & {
+  waitForToolsUntil?: (promise: Promise<unknown>) => void
+}
+
+export type ModelContextTool = WebMCP.ModelContextTool
+
+export type WebMCPStatus = 'native' | 'polyfill' | 'unavailable'
+
+export interface RegisterToolsOptions {
+  signal: AbortSignal
+  exposedTo?: readonly string[] | undefined
+  onCollision?: ((requestedName: string, registeredName: string) => void) | undefined
+}
+
+const MAX_NAME_ATTEMPTS = 3
+const availabilityListeners = new Set<() => void>()
+let pendingPolyfill: Promise<ModelContext | undefined> | undefined
+
+export function getModelContext(): ModelContext | undefined {
+  if (typeof document === 'undefined') return undefined
+  const context = document.modelContext
+  return context && typeof context.registerTool === 'function' ? context : undefined
+}
+
+export function getWebMCPStatus(): WebMCPStatus {
+  const context = getModelContext()
+  if (!context) return 'unavailable'
+  return Function.prototype.toString.call(context.registerTool).includes('[native code]') ? 'native' : 'polyfill'
+}
+
+export function loadPolyfill(): Promise<ModelContext | undefined> {
+  pendingPolyfill ??= import('@w3c/webmcp-polyfill').then(({ installWebMCP }) => {
+    installWebMCP()
+    for (const listener of availabilityListeners) listener()
+    availabilityListeners.clear()
+    return getModelContext()
+  })
+  return pendingPolyfill
+}
+
+export function whenModelContextAvailable(signal: AbortSignal): Promise<ModelContext | undefined> {
+  const context = getModelContext()
+  if (context) return Promise.resolve(context)
+  return new Promise((resolve) => {
+    const listener = () => resolve(getModelContext())
+    availabilityListeners.add(listener)
+    signal.addEventListener(
+      'abort',
+      () => {
+        availabilityListeners.delete(listener)
+        resolve(undefined)
+      },
+      { once: true },
+    )
+  })
+}
+
+export function resolveModelContext(polyfill: boolean, signal: AbortSignal): Promise<ModelContext | undefined> {
+  const context = getModelContext()
+  if (context) return Promise.resolve(context)
+  return polyfill ? loadPolyfill() : whenModelContextAvailable(signal)
+}
+
+export function registerTools(
+  context: ModelContext,
+  tools: readonly ModelContextTool[],
+  options: RegisterToolsOptions,
+): Promise<PromiseSettledResult<string>[]> {
+  const registrations = Promise.allSettled(tools.map((tool) => registerTool(context, tool, options, 1)))
+  if (typeof context.waitForToolsUntil === 'function') {
+    context.waitForToolsUntil(registrations)
+  }
+  return registrations
+}
+
+async function registerTool(
+  context: ModelContext,
+  tool: ModelContextTool,
+  options: RegisterToolsOptions,
+  attempt: number,
+): Promise<string> {
+  const name = attempt === 1 ? tool.name : `${tool.name}_${attempt}`
+  const registerOptions: WebMCP.ModelContextRegisterToolOptions = { signal: options.signal }
+  if (options.exposedTo) registerOptions.exposedTo = [...options.exposedTo]
+  try {
+    await context.registerTool({ ...tool, name }, registerOptions)
+  } catch (error) {
+    const collided = error instanceof DOMException && error.name === 'InvalidStateError'
+    if (!collided || options.signal.aborted || attempt >= MAX_NAME_ATTEMPTS) throw error
+    return registerTool(context, tool, options, attempt + 1)
+  }
+  if (attempt > 1) options.onCollision?.(tool.name, name)
+  return name
+}
