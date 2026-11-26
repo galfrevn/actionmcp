@@ -20,6 +20,7 @@ export interface AnalysisCache {
 
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mts|mjs)$/
 const TYPES_CACHE_FILE = 'cache/types.json'
+const PACKAGE_MANIFEST = { file: 'package.json', line: 1, column: 1 }
 
 export function createAnalysisCache(): AnalysisCache {
   return { modules: new Map() }
@@ -35,7 +36,7 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
 
   const tools = scans.flatMap((scan) => scan.tools)
   const diagnostics = scans.flatMap((scan) => scan.diagnostics)
-  await resolveTypes(config, scans, diagnostics)
+  resolveTypes(config, scans, diagnostics)
 
   if (config.registry && registryFile) {
     const registry = scanRegistryModule(parseModule(registryFile, readFileSync(config.registry, 'utf8')))
@@ -80,12 +81,13 @@ function scanFile(config: ResolvedConfig, cache: AnalysisCache, file: string): M
   return cached.scan ? structuredClone(cached.scan) : undefined
 }
 
-async function resolveTypes(config: ResolvedConfig, scans: readonly ModuleScan[], diagnostics: Diagnostic[]): Promise<void> {
+function resolveTypes(config: ResolvedConfig, scans: readonly ModuleScan[], diagnostics: Diagnostic[]): void {
   const requests = scans.flatMap((scan) => scan.typeRequests)
-  const inferences = await inferParameterSchemas(
+  const inferences = inferParameterSchemas(
     requests.map((request) => ({ file: join(config.cwd, request.file), parameterOffset: request.parameterOffset })),
     { cwd: config.cwd, cacheFile: join(config.outDir, TYPES_CACHE_FILE) },
   )
+  let missingToolchain = false
   requests.forEach(({ tool, file }, index) => {
     const inference = inferences[index]
     if (inference?.ok) {
@@ -93,9 +95,12 @@ async function resolveTypes(config: ResolvedConfig, scans: readonly ModuleScan[]
       return
     }
     tool.schemaSource = 'none'
-    if (!tool.diagnostics.includes('AT101')) tool.diagnostics.push('AT101')
-    diagnostics.push(createDiagnostic('AT101', { file, line: tool.source.line, column: 1 }, inference?.reason, tool.name))
+    const code = inference?.missingToolchain ? 'AT206' : 'AT101'
+    if (!tool.diagnostics.includes(code)) tool.diagnostics.push(code)
+    if (code === 'AT206') missingToolchain = true
+    else diagnostics.push(createDiagnostic(code, { file, line: tool.source.line, column: 1 }, inference?.reason, tool.name))
   })
+  if (missingToolchain) diagnostics.push(createDiagnostic('AT206', PACKAGE_MANIFEST))
 }
 
 function adoptDiscoveredTool(tools: AnalyzedTool[], { tool, exportName }: ToolReference): void {

@@ -6,13 +6,14 @@ import type ts from 'typescript'
 import { isRecord } from '../core/guards'
 import { sanitizeJsonSchema } from '../core/schema'
 import type { JsonSchema } from '../core/types'
+import { SCHEMA_GENERATOR_PACKAGE, loadTypeToolchain, toolchainOrigins, type TypeToolchain } from './toolchain'
 
 export interface TypeTarget {
   file: string
   parameterOffset: number
 }
 
-export type TypeInference = { ok: true; schema: JsonSchema } | { ok: false; reason: string }
+export type TypeInference = { ok: true; schema: JsonSchema } | { ok: false; reason: string; missingToolchain?: true }
 
 export interface InferenceOptions {
   cwd: string
@@ -25,27 +26,35 @@ interface CacheEntry {
 }
 
 const CACHE_VERSION = 1
+const UNREADABLE_TYPE: TypeInference = { ok: false, reason: 'The type could not be read.' }
+const MISSING_TOOLCHAIN: TypeInference = {
+  ok: false,
+  reason: `${SCHEMA_GENERATOR_PACKAGE} is not installed`,
+  missingToolchain: true,
+}
 
-export async function inferParameterSchemas(
-  targets: readonly TypeTarget[],
-  options: InferenceOptions,
-): Promise<TypeInference[]> {
+export function inferParameterSchemas(targets: readonly TypeTarget[], options: InferenceOptions): TypeInference[] {
   if (targets.length === 0) return []
   const cache = readCache(options.cacheFile)
   const tsconfig = findTsconfig(options.cwd)
   const tsconfigText = tsconfig ? readFileSync(tsconfig, 'utf8') : ''
   const hashes = targets.map((target) => hashTarget(target, tsconfigText))
-  const missing = targets.filter((target, index) => cache.get(cacheKey(target))?.hash !== hashes[index])
-  if (missing.length > 0) {
-    const inferred = await inferWithTypeScript(missing, options.cwd, tsconfig)
-    missing.forEach((target, index) => {
-      const inference = inferred[index]
-      const hash = hashes[targets.indexOf(target)]
-      if (inference && hash !== undefined) cache.set(cacheKey(target), { hash, inference })
-    })
-    writeCache(options.cacheFile, cache, targets)
+  const isCached = (target: TypeTarget, index: number) => cache.get(cacheKey(target))?.hash === hashes[index]
+  const missing = targets.filter((target, index) => !isCached(target, index))
+  if (missing.length === 0) return targets.map((target) => cache.get(cacheKey(target))?.inference ?? UNREADABLE_TYPE)
+
+  const toolchain = loadTypeToolchain(toolchainOrigins(options.cwd))
+  if (!toolchain) {
+    return targets.map((target, index) => (isCached(target, index) ? cache.get(cacheKey(target))?.inference : undefined) ?? MISSING_TOOLCHAIN)
   }
-  return targets.map((target) => cache.get(cacheKey(target))?.inference ?? { ok: false, reason: 'The type could not be read.' })
+  const inferred = inferWithTypeScript(toolchain, missing, options.cwd, tsconfig)
+  missing.forEach((target, index) => {
+    const inference = inferred[index]
+    const hash = hashes[targets.indexOf(target)]
+    if (inference && hash !== undefined) cache.set(cacheKey(target), { hash, inference })
+  })
+  writeCache(options.cacheFile, cache, targets)
+  return targets.map((target) => cache.get(cacheKey(target))?.inference ?? UNREADABLE_TYPE)
 }
 
 export function normalizeTypeSchema(schema: Record<string, unknown>): TypeInference {
@@ -69,13 +78,12 @@ function renameDefinitionReferences(node: unknown): unknown {
   )
 }
 
-async function inferWithTypeScript(
+function inferWithTypeScript(
+  { typescript, generator: generatorModule }: TypeToolchain,
   targets: readonly TypeTarget[],
   cwd: string,
   tsconfig: string | undefined,
-): Promise<TypeInference[]> {
-  const { default: typescript } = await import('typescript')
-  const generatorModule = await import('ts-json-schema-generator')
+): TypeInference[] {
   const { SchemaGenerator, createFormatter, createParser, DEFAULT_CONFIG } = generatorModule
   const compilerOptions: ts.CompilerOptions = {
     ...readCompilerOptions(typescript, cwd, tsconfig),

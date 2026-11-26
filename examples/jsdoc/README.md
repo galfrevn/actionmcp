@@ -2,7 +2,7 @@
 
 Two Server Functions become WebMCP tools with the `@agent` JSDoc tag.
 
-The tag is experimental and opt-in. `next.config.ts` enables it with `withAgentTools({ jsdoc: true })`.
+The tag is experimental and opt-in. `next.config.ts` enables it with `withAgentTools({ jsdoc: true })`, and `ts-json-schema-generator` is a development dependency of the app.
 
 | Tool | Tag | Confirmation |
 |---|---|---|
@@ -29,3 +29,4 @@ Run `pnpm --filter example-jsdoc inspect task.rename` to print the inferred sche
 
 - `app/actions.ts`: the two tagged functions and their input types.
 - `next.config.ts`: `jsdoc: true`.
+- `package.json`: `ts-json-schema-generator`, which infers the schemas.

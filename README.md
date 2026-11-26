@@ -105,6 +105,7 @@ The `polyfill` option of `<AgentTools />` loads [`@w3c/webmcp-polyfill`](https:/
 - React 19.2 or later.
 - Node.js 22.18 or later.
 - A validator with Standard JSON Schema support: Zod 4.2+, ArkType 2.1.28+, or Valibot 1.2+ with `@valibot/to-json-schema`.
+- For the experimental `@agent` tag only: `ts-json-schema-generator` as a development dependency.
 
 ## Examples
 

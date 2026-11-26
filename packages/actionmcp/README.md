@@ -12,7 +12,7 @@ The documentation is in the repository: https://github.com/galfrevn/actionmcp#re
 npm install actionmcp
 ```
 
-actionmcp requires Next.js 16.x and React 19.2 or later.
+actionmcp requires Next.js 16.x and React 19.2 or later. The experimental `@agent` tag also needs `ts-json-schema-generator` as a development dependency.
 
 ## Usage
 
