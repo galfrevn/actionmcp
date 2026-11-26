@@ -30,3 +30,6 @@ tests/integration/.tmp/
 fixtures/*/AGENTS.md
 examples/*/AGENTS.md
 bench/app/AGENTS.md
+
+# Benchmark database and local results
+bench/app/.data/

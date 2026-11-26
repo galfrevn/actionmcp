@@ -17,7 +17,8 @@
     "test:package": "vitest run --config tests/package/vitest.config.ts",
     "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit",
     "lint": "oxlint --deny-warnings",
-    "bench": "node bench/run.ts"
+    "bench": "pnpm --filter actionmcp-bench start",
+    "bench:smoke": "pnpm --filter actionmcp-bench smoke"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.1",
