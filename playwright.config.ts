@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test'
-import { fixtureServers } from './e2e/support/fixtures'
+import { exampleServers, fixtureServers } from './e2e/support/fixtures'
 
 const isCI = Boolean(process.env.CI)
 
@@ -16,7 +16,7 @@ export default defineConfig({
     { name: 'polyfill' },
     { name: 'native', use: { launchOptions: { args: ['--enable-features=WebMCP'] } } },
   ],
-  webServer: fixtureServers.map((server) => ({
+  webServer: [...fixtureServers, ...exampleServers].map((server) => ({
     command: `pnpm exec next ${server.mode} -p ${server.port}`,
     cwd: server.directory,
     url: `http://localhost:${server.port}`,

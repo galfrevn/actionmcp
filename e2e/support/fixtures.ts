@@ -5,19 +5,37 @@ export interface FixtureServer {
   mode: 'start' | 'dev'
 }
 
-const PRODUCTION_FIXTURES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'scoped', 'navigate', 'redirect', 'hostile', 'coexist'] as const
+const FIXTURES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'scoped', 'navigate', 'redirect', 'hostile', 'coexist'] as const
+const EXAMPLES = ['basic', 'formdata', 'safe-action', 'jsdoc', 'chat'] as const
 
-export type FixtureName = (typeof PRODUCTION_FIXTURES)[number] | 'basic-dev'
+export type FixtureName = (typeof FIXTURES)[number] | 'basic-dev'
+export type ExampleName = (typeof EXAMPLES)[number]
 
-const BASE_PORT = 4101
+const FIXTURE_BASE_PORT = 4101
+const EXAMPLE_BASE_PORT = 4151
 
 export const fixtureServers: FixtureServer[] = [
-  ...PRODUCTION_FIXTURES.map((name, index) => ({ name, directory: `fixtures/${name}`, port: BASE_PORT + index, mode: 'start' as const })),
-  { name: 'basic-dev', directory: 'fixtures/basic', port: BASE_PORT + PRODUCTION_FIXTURES.length, mode: 'dev' },
+  ...FIXTURES.map((name, index) => ({ name, directory: `fixtures/${name}`, port: FIXTURE_BASE_PORT + index, mode: 'start' as const })),
+  { name: 'basic-dev', directory: 'fixtures/basic', port: FIXTURE_BASE_PORT + FIXTURES.length, mode: 'dev' },
 ]
 
-export function fixtureUrl(name: FixtureName, path = '/'): string {
-  const server = fixtureServers.find((candidate) => candidate.name === name)
-  if (!server) throw new Error(`Unknown fixture "${name}".`)
+export const exampleServers: FixtureServer[] = EXAMPLES.map((name, index) => ({
+  name,
+  directory: `examples/${name}`,
+  port: EXAMPLE_BASE_PORT + index,
+  mode: 'start',
+}))
+
+function serverUrl(servers: readonly FixtureServer[], name: string, path: string): string {
+  const server = servers.find((candidate) => candidate.name === name)
+  if (!server) throw new Error(`Unknown app "${name}".`)
   return `http://localhost:${server.port}${path}`
+}
+
+export function fixtureUrl(name: FixtureName, path = '/'): string {
+  return serverUrl(fixtureServers, name, path)
+}
+
+export function exampleUrl(name: ExampleName, path = '/'): string {
+  return serverUrl(exampleServers, name, path)
 }
