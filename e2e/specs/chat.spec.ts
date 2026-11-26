@@ -108,6 +108,31 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
     expect(response.status()).toBe(401)
   })
 
+  test('the route accepts reasoning parts from the model and rejects attachments', async ({ page }) => {
+    await open(page)
+    const tools = [{ name: 'listTodos', description: 'List the todos.', inputSchema: { type: 'object' } }]
+    const user = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'What is on my list?' }] }
+    const post = (parts: Array<Record<string, unknown>>) =>
+      page.evaluate(
+        async (body) => {
+          const response = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          await response.body?.cancel()
+          return response.status
+        },
+        { tools, messages: [user, { id: 'a1', role: 'assistant', parts }] },
+      )
+    const toolResult = {
+      type: 'dynamic-tool',
+      toolName: 'listTodos',
+      toolCallId: 'call-1',
+      state: 'output-available',
+      input: {},
+      output: { content: [{ type: 'text', text: '{"ok":true,"data":[]}' }] },
+    }
+    expect(await post([{ type: 'step-start' }, { type: 'reasoning', text: 'Read the list first.', state: 'done' }, toolResult])).toBe(200)
+    expect(await post([{ type: 'file', mediaType: 'image/png', url: 'https://example.com/a.png' }])).toBe(400)
+  })
+
   test('the route rejects more than 32 tool definitions and invalid definitions', async ({ page }) => {
     await open(page)
     const post = (tools: unknown) =>

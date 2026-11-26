@@ -9,7 +9,7 @@ An in-app assistant that uses the page's own WebMCP tools through the AI SDK. Th
 3. `app/api/chat/route.ts` turns the definitions into tools without `execute` with `createMCPTools()` and calls `streamText()`.
 4. When the model calls a tool, `onToolCall` runs it in the browser with `callTool()`. A consequential tool shows the confirmation dialog first. The result goes back to the model with `addToolOutput()`.
 
-The route rejects a request with more than 32 tool definitions, with invalid definitions, or with message parts other than text and tool results.
+The route rejects a request with more than 32 tool definitions, with invalid definitions, or with message parts other than text, the model's reasoning, and tool results.
 
 ## Run
 
