@@ -38,8 +38,12 @@ function postChat(page: Page, body: unknown): Promise<{ status: number; text: st
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: typeof payload === 'string' ? payload : JSON.stringify(payload),
     })
+    if (response.ok) {
+      await response.body?.cancel()
+      return { status: response.status, text: '' }
+    }
     return { status: response.status, text: await response.text() }
   }, body)
 }
@@ -139,6 +143,15 @@ test.describe('demo example: a public deployment with one list per visitor', () 
     const wordy = await postChat(page, { tools: [], messages: [message(0, 'a'.repeat(501))] })
     expect(wordy).toEqual({ status: 400, text: 'A message can have up to 500 characters.' })
 
+    const invalid = await postChat(page, 'not json')
+    expect(invalid).toEqual({ status: 400, text: 'The request body is not JSON.' })
+
+    const oversized = await postChat(page, {
+      messages: [message(0)],
+      tools: [{ name: 'listTodos', description: 'a'.repeat(70_000), inputSchema: { type: 'object' } }],
+    })
+    expect(oversized).toEqual({ status: 413, text: 'This conversation is too long for the demo. Reload the page to start a new one.' })
+
     const toolResult = {
       type: 'dynamic-tool',
       toolName: 'listTodos',
@@ -162,5 +175,41 @@ test.describe('demo example: a public deployment with one list per visitor', () 
       { tools, messages: [message(0), { id: 'a1', role: 'assistant', parts: [{ type: 'step-start' }, providerPart, toolResult] }] },
     )
     expect(status).toBe(200)
+  })
+
+  test('a long conversation with the real tools and a full list stays under the size limit', async ({ page }) => {
+    await start(page)
+    const requests = await mockModel(page, [reply('Hello.')])
+    await page.getByLabel('Message').fill('Hello')
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect(page.getByTestId('messages')).toContainText('Hello.')
+    await page.unroute('**/api/chat')
+
+    const todos = Array.from({ length: 8 }, (_value, index) => ({ id: `0000000${index}`, text: 'x'.repeat(80), done: false }))
+    const listOutput = { content: [{ type: 'text', text: JSON.stringify({ ok: true, data: todos }) }] }
+    const messages = Array.from({ length: 10 }, (_value, index) => [
+      { id: `u${index}`, role: 'user', parts: [{ type: 'text', text: 'What is on my list right now? '.repeat(4) }] },
+      {
+        id: `a${index}`,
+        role: 'assistant',
+        parts: [
+          { type: 'step-start' },
+          {
+            type: 'dynamic-tool',
+            toolName: 'listTodos',
+            toolCallId: `call-${index}`,
+            state: 'output-available',
+            input: {},
+            output: listOutput,
+          },
+          { type: 'step-start' },
+          { type: 'text', text: 'Here is your list with every item and its state. '.repeat(24), state: 'done' },
+        ],
+      },
+    ]).flat()
+
+    const body = { tools: requests[0]?.tools, messages }
+    expect(JSON.stringify(body).length).toBeGreaterThan(24 * 1024)
+    expect((await postChat(page, body)).status).toBe(200)
   })
 })
