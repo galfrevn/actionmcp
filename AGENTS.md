@@ -26,5 +26,6 @@ The package is in `packages/actionmcp`. The fixture apps, the examples, and the 
 - **Tooling:** pnpm, turbo, tsdown, vitest, Playwright, oxlint.
 - **Do not:**
   - expose actions by default;
-  - publish to npm or post publicly without the maintainer's approval;
+  - publish to npm from a local machine. Releases go through the `Release` workflow, as described in the "Releasing" section of `CONTRIBUTING.md`;
+  - post publicly without the maintainer's approval;
   - invent benchmark results.

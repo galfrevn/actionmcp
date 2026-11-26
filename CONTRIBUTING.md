@@ -57,6 +57,30 @@ Read [AGENTS.md](AGENTS.md) before you use a coding agent. You are responsible f
 
 Write commit messages in the imperative mood, in lowercase, with a Conventional Commits prefix: `feat`, `fix`, `docs`, `test`, `ci`, `build`, or `chore`. Keep each commit to one change. For example: `docs: add security policy`.
 
+## Releasing
+
+Releases are published from GitHub Actions, never from a local machine. The `Release` workflow verifies the code, publishes `actionmcp` to npm with provenance, and creates the GitHub release.
+
+1. Update `version` in `packages/actionmcp/package.json` and add the version to `CHANGELOG.md`. Merge the change to `main`.
+2. Push a tag that matches the version:
+
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+3. Approve the deployment to the `npm` environment when GitHub asks. The workflow then publishes and creates the release.
+
+A version with a hyphen, such as `0.2.0-beta.1`, is published under the `next` dist-tag. Any other version is published under `latest`.
+
+To check a release without publishing, run the workflow by hand with `dry-run` enabled:
+
+```bash
+gh workflow run release.yml -f dry-run=true
+```
+
+The workflow needs one secret in the `npm` environment: `NPM_TOKEN`, a granular npm access token with read and write access to `actionmcp`.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
