@@ -231,6 +231,21 @@ describe('Registrar', () => {
     await expect(second).resolves.toMatchObject({ ok: false })
   })
 
+  it('focuses Cancel again for each queued confirmation', async () => {
+    await render(<Registrar tools={[createTool(), createTool({ name: 'removeMember' })]} />)
+    const first = (await execute('deleteAccount')).output
+    const second = (await execute('removeMember')).output
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    const allow = button('Allow')
+    allow.focus()
+    await act(async () => allow.click())
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(document.querySelector('dialog')?.textContent).toContain('removeMember')
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    await act(async () => button('Cancel').click())
+    await expect(second).resolves.toMatchObject({ ok: false })
+  })
+
   it('shows one confirmation at a time across two registrars', async () => {
     await render(
       <>

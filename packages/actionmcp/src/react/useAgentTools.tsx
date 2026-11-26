@@ -10,6 +10,7 @@ import {
   currentConfirmation,
   dequeueConfirmation,
   enqueueConfirmation,
+  nextConfirmationId,
   subscribeToConfirmations,
   type PendingConfirmation,
 } from './confirmations'
@@ -55,6 +56,7 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
     (call, tool, signal) =>
       new Promise<boolean>((resolve) => {
         const confirmation: PendingConfirmation = {
+          id: nextConfirmationId(),
           owner,
           call,
           tool,
@@ -142,6 +144,7 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
   const Confirm = hooks.confirmComponent ?? ConfirmDialog
   return (
     <Confirm
+      key={current.id}
       call={current.call}
       title={current.tool.title}
       description={current.tool.description}

@@ -1,6 +1,7 @@
 import type { SerializableToolDef, ToolCall } from '../core/types'
 
 export interface PendingConfirmation {
+  id: number
   owner: object
   call: ToolCall
   tool: SerializableToolDef
@@ -9,6 +10,12 @@ export interface PendingConfirmation {
 
 const listeners = new Set<() => void>()
 let queue: readonly PendingConfirmation[] = []
+let lastId = 0
+
+export function nextConfirmationId(): number {
+  lastId += 1
+  return lastId
+}
 
 export function enqueueConfirmation(confirmation: PendingConfirmation): void {
   queue = [...queue, confirmation]

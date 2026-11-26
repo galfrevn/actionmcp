@@ -47,6 +47,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - A tool in a `.mts` file is an `AT004` error that asks to rename the file to `.ts`. Next.js does not apply `'use server'` to `.mts` files, so before, the generated registry passed a plain function to the client and `next build` failed while prerendering.
 - A failed import of the polyfill is logged, and the next `<AgentTools />` that mounts loads it again. Before, the failure stayed cached until a reload and produced an unhandled promise rejection.
 - The devtools panel reports "native" only when `registerTool` and the constructor of `document.modelContext` are browser functions. Before, a context built by a script around a bound function showed as native.
+- The next confirmation in the queue opens as a new dialog with the focus on "Cancel". Before, it reused the previous dialog and kept the focus on "Allow", so Enter approved it.
 
 ## 0.2.0
 
