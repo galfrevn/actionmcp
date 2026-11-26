@@ -39,6 +39,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The `navigate` tool counts a `generateStaticParams` in a layout, such as `app/[lang]/layout.tsx`, for the dynamic segments at or above it. Before, only a `generateStaticParams` in the page counted, so an app under `app/[lang]` had no `navigate` tool by default.
 - An error of a file watcher in `next dev` or `actionmcp generate --watch`, such as `ENOSPC` or `EMFILE`, is reported and stops only that watcher. Before, it crashed the process.
 - In watch mode, a scan root such as `lib/` and a default registry file such as `agent-tools.ts` that are created after the start are watched and analyzed. Before, they needed a restart.
+- A tool in a `.mts` file is an `AT004` error that asks to rename the file to `.ts`. Next.js does not apply `'use server'` to `.mts` files, so before, the generated registry passed a plain function to the client and `next build` failed while prerendering.
 
 ## 0.2.0
 

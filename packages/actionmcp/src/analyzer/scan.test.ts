@@ -112,6 +112,13 @@ describe('agent() detection', () => {
     expect(result.diagnostics[0]).toMatchObject({ file: 'app/actions.ts', line: 4, column: 16, level: 'error' })
   })
 
+  it("reports AT004 for a tool in a .mts file, whose 'use server' Next.js does not apply", () => {
+    const result = scan(`${SERVER}export const a = agent({ ${DESCRIPTION} }, ${authedHandler})\n`, true, 'lib/actions.mts')
+    expect(codes(result)).toEqual(['AT004'])
+    expect(result.diagnostics[0]?.message).toContain('rename the file to .ts')
+    expect(scan(`${SERVER}export const a = agent({ ${DESCRIPTION} }, ${authedHandler})\n`, true, 'lib/actions.mjs').diagnostics).toEqual([])
+  })
+
   it("reports AT004 for a file without 'use server'", () => {
     const result = scan(`import { agent } from 'actionmcp/server'\nexport const a = agent({ ${DESCRIPTION} }, ${authedHandler})\n`)
     expect(codes(result)).toEqual(['AT004'])

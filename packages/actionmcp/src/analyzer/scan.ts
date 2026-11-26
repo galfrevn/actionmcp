@@ -42,9 +42,16 @@ interface ModuleContext {
 const SERVER_ENTRY = 'actionmcp/server'
 const COMPONENT_ENTRIES = ['actionmcp', 'actionmcp/client']
 const MIN_DESCRIPTION_LENGTH = 20
+const UNSUPPORTED_SERVER_FILE = /\.mts$/
 const VALIDATION_CALL = /^(?:parse|safeParse|parseAsync|safeParseAsync|validate|assert\w*)$/
 const FREE_FORM_STRING = /\bstring\s*\(|['"`]string\b/
 const PERSONAL_FIELDS = new Set(['email', 'phone', 'address', 'birthdate', 'birthday', 'dob', 'ssn', 'passport'])
+
+function serverFileProblem(context: ModuleContext): string {
+  return UNSUPPORTED_SERVER_FILE.test(context.module.file)
+    ? "Next.js does not turn a .mts file with 'use server' into Server Functions; rename the file to .ts"
+    : "the file has no 'use server' directive"
+}
 
 export function mayContainTools(code: string): boolean {
   return code.includes(SERVER_ENTRY) || code.includes('@agent') || code.includes('AgentTools')
@@ -54,7 +61,7 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
   const context: ModuleContext = {
     module,
     options,
-    useServer: hasUseServerDirective(module.program),
+    useServer: hasUseServerDirective(module.program) && !UNSUPPORTED_SERVER_FILE.test(module.file),
     agentNames: new Set(),
     namespaces: new Set(),
     componentNames: new Set(),
@@ -191,7 +198,7 @@ function addAgentTool(context: ModuleContext, call: CallExpression, exportName: 
   const report = reporter(context, tool)
 
   if (exportName === undefined) report('AT004', call.start, 'the agent() call is not exported')
-  if (!context.useServer) report('AT004', call.start, "the file has no 'use server' directive")
+  if (!context.useServer) report('AT004', call.start, serverFileProblem(context))
   if (exportName === 'default' && reading.name === undefined) report('AT001', call.start, 'a default export needs the `name` option')
   for (const issue of reading.issues) report(issue.code, issue.offset, issue.detail)
   checkDescription(tool, report, call.start)
@@ -239,7 +246,7 @@ function addJsdocTool(context: ModuleContext, comment: Comment, tag: AgentTag): 
 
   if (!target) report('AT004', offset, '@agent is not attached to a function')
   else if (exportName === undefined) report('AT004', offset, 'the function is not exported')
-  if (!context.useServer) report('AT004', offset, "the file has no 'use server' directive")
+  if (!context.useServer) report('AT004', offset, serverFileProblem(context))
   for (const modifier of tag.unknownModifiers) report('AT006', comment.start, `"${modifier}"`)
   if (tag.description === '') report('AT003', comment.start, 'the JSDoc comment has no description')
   checkDescription(tool, report, comment.start)

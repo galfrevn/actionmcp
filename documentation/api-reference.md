@@ -260,7 +260,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT001` | error | Invalid tool name, or a name that is not a string literal |
 | `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, `navigate`) |
 | `AT003` | error | Empty description |
-| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
+| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'`. Also a tool in a `.mts` file, because Next.js does not apply `'use server'` to `.mts` files |
 | `AT005` | error | The options are not an object literal or contain a spread, `description` is not a string literal, `readOnly`, `consequential`, or `untrustedOutput` is not a boolean literal, or `confirm` is not one of the three policies as a string literal |
 | `AT006` | error | Unknown `@agent` modifier |
 | `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal, or a value is not a `tool(...)` call, an imported `agent()` tool, or a `const` that holds a `tool(...)` call |
