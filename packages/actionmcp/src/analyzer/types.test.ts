@@ -159,6 +159,16 @@ describe('normalizeTypeSchema', () => {
     expect(normalizeTypeSchema(schema)).toEqual({ ok: true, schema: { type: 'object', properties: {} } })
   })
 
+  it('accepts a union of object types and marks it as an object', () => {
+    const schema = {
+      anyOf: [
+        { type: 'object', properties: { a: { type: 'string' } } },
+        { type: 'object', properties: { b: { type: 'number' } } },
+      ],
+    }
+    expect(normalizeTypeSchema(schema)).toEqual({ ok: true, schema: { type: 'object', ...schema } })
+  })
+
   it('inlines acyclic definitions', () => {
     const schema = { type: 'object', properties: { role: { $ref: '#/definitions/Role' } }, definitions: { Role: { enum: ['a', 'b'] } } }
     expect(normalizeTypeSchema(schema)).toEqual({ ok: true, schema: { type: 'object', properties: { role: { enum: ['a', 'b'] } } } })

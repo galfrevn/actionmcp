@@ -79,6 +79,26 @@ describe('convertSchema', () => {
     expect(convertSchema(z.string())).toEqual({ ok: false, reason: 'A tool input schema must describe an object.' })
   })
 
+  it('accepts a union of objects at the root and marks it as an object', () => {
+    const schema = z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('email'), to: z.string() }),
+      z.object({ kind: z.literal('sms'), phone: z.string() }),
+    ])
+    const conversion = convertSchema(schema)
+    expect(conversion).toMatchObject({ ok: true, schema: { type: 'object', oneOf: [{ type: 'object' }, { type: 'object' }] } })
+    expect(convertSchema(z.union([z.object({ a: z.string() }), z.object({ b: z.number() })]))).toMatchObject({
+      ok: true,
+      schema: { type: 'object' },
+    })
+  })
+
+  it('reports a root union with a branch that is not an object', () => {
+    expect(convertSchema(z.union([z.object({ a: z.string() }), z.string()]))).toEqual({
+      ok: false,
+      reason: 'A tool input schema must describe an object.',
+    })
+  })
+
   it('allows an output schema that is not an object', () => {
     expect(convertSchema(z.array(z.string()), 'output')).toEqual({
       ok: true,

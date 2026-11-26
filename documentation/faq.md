@@ -75,6 +75,10 @@ Any validator that implements Standard JSON Schema: Zod 4.2 or later, ArkType 2.
 
 If a schema validates but cannot produce JSON Schema, the tool is registered without `inputSchema` and actionmcp logs `AT101` in development.
 
+## Can the input be a union?
+
+Yes, when every branch is an object, such as `z.discriminatedUnion('kind', [...])`. actionmcp adds `type: 'object'` next to the `oneOf` or `anyOf` of the schema. An input that is not an object, or a union with a branch that is not an object, produces `AT101`.
+
 ## How do I accept a date?
 
 Use `z.coerce.date()`. A tool input arrives as JSON, so a date arrives as a string, and `z.date()` rejects it. actionmcp describes `z.coerce.date()` to the agent as `{ type: 'string', format: 'date-time' }`. A `z.date()` field in an input schema produces `AT101` with that explanation, and the tool is registered without `inputSchema`.

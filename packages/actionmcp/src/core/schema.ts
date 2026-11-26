@@ -35,10 +35,9 @@ export function convertSchema(schema: StandardSchemaV1, direction: SchemaDirecti
     const converted = sanitizeJsonSchema(
       jsonSchema[direction]({ target: JSON_SCHEMA_TARGET, ...(libraryOptions ? { libraryOptions } : {}) }),
     )
-    if (direction === 'input' && converted.type !== 'object') {
-      return { ok: false, reason: 'A tool input schema must describe an object.' }
-    }
-    return { ok: true, schema: converted }
+    if (direction === 'output') return { ok: true, schema: converted }
+    const object = asObjectSchema(converted)
+    return object ? { ok: true, schema: object } : { ok: false, reason: 'A tool input schema must describe an object.' }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }
@@ -68,6 +67,17 @@ function zodOptions(direction: SchemaDirection): Record<string, unknown> {
       }
     },
   }
+}
+
+export function asObjectSchema(schema: JsonSchema): JsonSchema | undefined {
+  if (schema.type === 'object') return schema
+  const branches = schema.oneOf ?? schema.anyOf
+  const isObjectUnion =
+    schema.type === undefined &&
+    Array.isArray(branches) &&
+    branches.length > 0 &&
+    branches.every((branch) => isRecord(branch) && branch.type === 'object')
+  return isObjectUnion ? { type: 'object', ...schema } : undefined
 }
 
 export function sanitizeJsonSchema(schema: JsonSchema): JsonSchema {
