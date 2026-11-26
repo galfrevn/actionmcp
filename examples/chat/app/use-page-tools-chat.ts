@@ -1,40 +1,34 @@
 'use client'
 
-import {
-  createMCPClient,
-  Experimental_WebMCPTransport as WebMCPTransport,
-  type Experimental_WebMCPModelContext as WebMCPModelContext,
-  type MCPClient,
-} from '@ai-sdk/mcp'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { PageTools } from './page-tools'
+
+function createSession(api: string) {
+  const pageTools = new PageTools()
+  const transport = new DefaultChatTransport({
+    api,
+    async prepareSendMessagesRequest({ messages }) {
+      return { body: { messages, tools: await pageTools.list() } }
+    },
+  })
+  return { pageTools, transport }
+}
 
 export function usePageToolsChat(api: string) {
-  const client = useRef<MCPClient>(undefined)
+  const [{ pageTools, transport }] = useState(() => createSession(api))
   const [ready, setReady] = useState(false)
   const [setupError, setSetupError] = useState<string>()
-
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api,
-        async prepareSendMessagesRequest({ messages }) {
-          const listed = await client.current?.listTools()
-          return { body: { messages, tools: listed?.tools ?? [] } }
-        },
-      }),
-    [api],
-  )
 
   const chat = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     async onToolCall({ toolCall }) {
-      if (!toolCall.dynamic || !client.current) return
+      if (!toolCall.dynamic) return
       const { toolName: tool, toolCallId } = toolCall
       try {
-        const output = await client.current.callTool({ name: tool, arguments: toolCall.input as Record<string, unknown> })
+        const output = await pageTools.call(tool, toolCall.input as Record<string, unknown>)
         void chat.addToolOutput({ tool, toolCallId, output })
       } catch (error) {
         const errorText = error instanceof Error ? error.message : String(error)
@@ -44,31 +38,14 @@ export function usePageToolsChat(api: string) {
   })
 
   useEffect(() => {
-    const modelContext = document.modelContext as WebMCPModelContext | undefined
-    if (!modelContext) {
-      setSetupError('WebMCP is not available in this browser.')
-      return
-    }
-    let active = true
-    let connected: MCPClient | undefined
-    void createMCPClient({ transport: new WebMCPTransport({ modelContext }) }).then(
-      (mcpClient) => {
-        if (!active) {
-          void mcpClient.close()
-          return
-        }
-        connected = mcpClient
-        client.current = mcpClient
-        setReady(true)
+    pageTools.connect().then(
+      (connected) => {
+        if (connected) setReady(true)
       },
       (error: unknown) => setSetupError(error instanceof Error ? error.message : String(error)),
     )
-    return () => {
-      active = false
-      if (client.current === connected) client.current = undefined
-      void connected?.close()
-    }
-  }, [])
+    return () => pageTools.close()
+  }, [pageTools])
 
   return { ...chat, ready, setupError }
 }
