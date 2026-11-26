@@ -30,8 +30,8 @@ We need to know which Server Functions are marked as tools across the whole proj
 - The output is the same with Turbopack and with webpack, and it does not depend on compiler internals.
 - The generated artifact can be inspected with `inspect` and `doctor`, and the manifest can be reviewed in pull requests.
 - The pattern is familiar: `next typegen`, `.next/types`, contentlayer, and velite use it.
-- Trade-off: a watcher must be maintained (spike SP4), and the registry can go stale. Mitigation: `generate` in `prebuild` fails when it finds an inconsistency.
-- Trade-off: the alias can fail (spike SP3). The escape hatch is `<AgentTools registry={…} />`.
+- Trade-off: a watcher must be maintained (spike SP4 verified it), and the registry can go stale. Mitigation: `withAgentTools()` runs `generate` during `next build` and aborts on `AT0xx` errors.
+- Trade-off: the alias is one more moving part (spike SP3 verified it). The escape hatch is `<AgentTools registry={…} />`.
 
 ## ADR-002: Standard Schema first, TypeScript types as fallback
 
@@ -86,7 +86,7 @@ There is no "expose all" mode and no flag that enables one.
 
 ## ADR-004: Execute through the native Server Function RPC
 
-Status: Accepted. Depends on spike SP1.
+Status: Accepted. Spike SP1 verified it on 2026-11-26.
 Date: 2026-11-26
 
 ### Context
@@ -105,12 +105,12 @@ Option 2. The `<AgentTools />` RSC passes the Server Function reference as a pro
 - No new server surface. The tool has exactly the permissions of the user.
 - The UI updates after an agent action with no extra code. The demo app depends on this behavior.
 - Trade-off: the tool inherits the sequential dispatch of Server Actions (one at a time per client) and the inability to cancel an action in flight. This is documented. Planned for phase 2: read-only tools through GET.
-- Trade-off: the tool inherits the behavior of `redirect()` (spike SP2).
+- Trade-off: the tool inherits the behavior of `redirect()`. Spike SP2 showed that the result can still be returned.
 - Every exposed action is now referenced by the client. This follows from opt-in, but it must be documented: dead-code elimination no longer removes it from the bundle.
 
 ## ADR-005: RSC registry and route scoping by composition
 
-Status: Proposed (to be confirmed with spikes SP1 and SP3)
+Status: Accepted. Spikes SP1 and SP3 verified it on 2026-11-26.
 Date: 2026-11-26
 
 ### Context
@@ -128,15 +128,15 @@ The initial plan generated a `'use client'` module. It imported the actions and 
   - and passes serializable definitions, plus the Server Function references, to a client `Registrar`.
 - Scope follows composition. Tools exist while the `<AgentTools />` that includes them is mounted. In `app/layout.tsx` they are global. In `app/team/layout.tsx` they exist only under `/team/**`. `include` and `exclude` filter the registry at each point.
 - `agent()` metadata: the function it returns carries the metadata (options and schema) in its own symbol or WeakMap. The RSC reads it when it imports the `'use server'` module on the server.
-  - Unverified: SP1 checks whether this is the same instance.
-  - Plan B, if it is not: for each `agent()` export, codegen generates a registry entry that re-imports the options from a generated sibling export in `.agent-tools/meta/*.ts`. That file evaluates the `agent()` call outside the `'use server'` file. This requires a refactor of the analyzer.
+  - Verified by SP1: the Server Component receives the same function instance, with its metadata.
+  - The plan B that generated `.agent-tools/meta/*.ts` files is not needed and is not implemented.
 
 ### Consequences
 
 - The validator never reaches the client bundle. Only JSON travels.
 - The scope is explicit, and it matches what developers who know the App Router expect.
 - RSC performance depends on schema computation. The schemas are cached at module level because the result is deterministic.
-- The metadata depends on module identity in the RSC layer (SP1).
+- The metadata depends on module identity in the RSC layer. The fixtures check this on every build.
 
 ## ADR-006: Package name
 
@@ -238,7 +238,7 @@ The demo is built on a fork of `nextjs/saas-starter` (MIT, 16.3k stars on 2026-1
 
 ## ADR-010: Client registration layer, owned and thin
 
-Status: Proposed. Revisit when S2 is complete.
+Status: Accepted. Revisited on 2026-11-26, when S2 was complete.
 Date: 2026-11-26
 
 ### Context
@@ -251,16 +251,16 @@ Date: 2026-11-26
   - wrap `execute` with confirmation and adapters;
   - and load the polyfill conditionally.
 
-### Decision (proposed)
+### Decision
 
 - Write a small, owned layer in `core/webmcp.ts` (about 100 lines). It uses the types from `webmcp-types` and feature detection for each optional method.
-- Do not depend on `use-webmcp-tool` in v0.1. Instead, **test compatibility**: an example and a coexistence test on the same page.
+- Do not depend on `use-webmcp-tool` in v0.1. Instead, **test compatibility**: `fixtures/coexist` registers a tool with `use-webmcp-tool` on the same page, and `e2e/specs/coexist.spec.ts` checks both.
 - Revisit the decision if the spec changes more than twice during development. In that case, delegate registration to Chrome's hook to inherit its maintenance.
 
 ### Consequences
 
 - Full control of batching, signals, and confirmation, with no runtime dependencies.
-- Trade-off: the project maintains the layer itself against spec churn (R2). A nightly job against Canary mitigates this.
+- Trade-off: the project maintains the layer itself against spec churn (R2). The end-to-end suite runs against native WebMCP in Chromium on every commit.
 
 ## ADR-011: MIT license
 
@@ -338,3 +338,71 @@ Path C ships in v0.1 as experimental and opt-in. It is disabled by default (`jsd
 
 - If spike S1 slips, path C moves to v0.2.
 - `AT102` warns on JSDoc tools that have no runtime validation.
+
+## ADR-015: Tool failures are results, not rejections
+
+Status: Accepted
+Date: 2026-11-26
+
+### Context
+
+The first design rejected the `execute` Promise with a `DOMException`: `OperationError` for a failed action and `NotAllowedError` for a declined confirmation. Spike SP8 showed that consumers never see that information. Native Chromium and the polyfill replace every rejection with `OperationError: Tool execution failed.`. An agent that receives only that text cannot correct an invalid input, and cannot tell a declined confirmation from a crash.
+
+### Decision
+
+- `execute` resolves with one envelope for every outcome: `{ ok: true, data }` or `{ ok: false, error: { code, message, issues? } }`. This is the `AgentResult` type that `agent()` already returns.
+- The codes that the client adds are `declined` (the user cancelled the confirmation), `blocked` (`onBeforeExecute` returned `false`), and `failed` (the call threw).
+- `execute` rejects only when the consumer cancels the call. The rejection is an `AbortError`.
+- When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
+
+### Alternatives considered
+
+- Reject, as first designed. The agent loses the reason.
+- Return the unwrapped value on success and an envelope on failure. The two shapes are ambiguous when the data itself has an `ok` field.
+
+### Consequences
+
+- An agent can read validation issues and retry with a corrected input.
+- The AI SDK does not mark these results with `isError: true`, because nothing rejected. The model reads `ok: false` instead. The chat example states this in its instructions.
+- The envelope is one more level of nesting in every result.
+
+## ADR-016: Default routes of the navigate tool
+
+Status: Accepted
+Date: 2026-11-26
+
+### Context
+
+The `navigate` tool lists routes as an enum. Listing every route of `app/` by default could reveal routes that the developer did not mean to advertise, and a dynamic route gives the agent a free-form parameter.
+
+### Decision
+
+- `navigate` or `navigate={true}` lists the routes without dynamic segments, plus the dynamic routes whose page exports `generateStaticParams`.
+- `navigate={{ routes: [...] }}` replaces the default with the routes that match the globs. `*` matches inside one segment and `**` matches across segments. The patterns match route patterns such as `/projects/[id]`.
+- The tool accepts only a route from its enum. It builds the URL from `params` and `query`, and it never navigates to another origin.
+
+### Consequences
+
+- A dynamic route needs an explicit glob before an agent can open it.
+- Static routes are listed by default. A developer who wants to hide one passes `routes`.
+
+## ADR-017: `agent()` validates its output against the `output` schema
+
+Status: Accepted
+Date: 2026-11-26
+
+### Context
+
+Threat T9 in [security.md](security.md) left one question open: when a tool declares an `output` schema, should the library filter the output or only describe it.
+
+### Decision
+
+`agent()` validates the handler's return value with `output['~standard'].validate` on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, therefore removes undeclared fields. If validation fails, the tool returns `{ ok: false, error: { code: 'failed' } }` and none of the data.
+
+For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
+
+### Consequences
+
+- The output schema that the agent sees and the filter that runs on the server are the same object.
+- A handler can return a full record and rely on the schema to drop internal fields.
+- The filtering semantics come from the validator. A validator that passes unknown keys through does not filter.
