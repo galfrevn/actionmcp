@@ -27,6 +27,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - `notFound()`, `forbidden()`, and `unauthorized()` in an action return the `not_found`, `forbidden`, and `unauthorized` codes to the agent. An action that the server no longer knows after a deployment returns `stale_page`, and a server error in production returns `The tool failed.` Before, all of them returned `failed` with an internal Next.js message.
 - An `input` validator of `agent()` that throws returns a `failed` result, or the code of an `AgentToolError`, and the error is logged on the server. Before, the error escaped the result and the agent received the Next.js error.
 - The `errors` field of a form action state, such as `{ errors: { name: ['Required'] } }`, returns `invalid_input` with an issue for each message, and `{ error: { message } }` returns `failed`. An empty `validationErrors` is no longer a failure. Before, the first two returned `ok: true` and the third returned `invalid_input` without issues.
+- A Zod schema with `z.coerce.date()` in the input, or a Zod date in the output, converts to JSON Schema with `{ type: 'string', format: 'date-time' }`. Before, one date field left the tool without its whole schema. `z.date()` in an input still produces `AT101`, with a message that suggests `z.coerce.date()`.
 
 ## 0.2.0
 

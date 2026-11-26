@@ -75,6 +75,12 @@ Any validator that implements Standard JSON Schema: Zod 4.2 or later, ArkType 2.
 
 If a schema validates but cannot produce JSON Schema, the tool is registered without `inputSchema` and actionmcp logs `AT101` in development.
 
+## How do I accept a date?
+
+Use `z.coerce.date()`. A tool input arrives as JSON, so a date arrives as a string, and `z.date()` rejects it. actionmcp describes `z.coerce.date()` to the agent as `{ type: 'string', format: 'date-time' }`. A `z.date()` field in an input schema produces `AT101` with that explanation, and the tool is registered without `inputSchema`.
+
+In an `output` schema, a Zod date is described the same way, because the result reaches the agent as JSON and a `Date` becomes an ISO string.
+
 ## Why must my schema live outside the `'use server'` file?
 
 Only when you list existing actions in `agent-tools.ts`. A `'use server'` file can export only async functions, so `agent-tools.ts` cannot import a schema from it. Move the schema to a regular module and import it from both places. With `agent()` the schema stays next to the action.

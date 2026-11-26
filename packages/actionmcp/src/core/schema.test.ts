@@ -93,10 +93,66 @@ describe('convertSchema', () => {
   })
 
   it('reports a conversion that throws', () => {
-    const schema = z.object({ at: z.date() })
-    const conversion = convertSchema(schema)
-    expect(conversion.ok).toBe(false)
-    expect(conversion.ok ? '' : conversion.reason).not.toBe('')
+    const schema = z.object({ at: z.string() })
+    const throwing = {
+      '~standard': {
+        ...schema['~standard'],
+        jsonSchema: {
+          input: () => {
+            throw new Error('boom')
+          },
+          output: () => ({}),
+        },
+      },
+    }
+    expect(convertSchema(throwing as never)).toEqual({ ok: false, reason: 'boom' })
+  })
+
+  it('describes a coerced Zod date in the input and any Zod date in the output as a date-time string', () => {
+    const input = z.object({ title: z.string(), due: z.coerce.date() })
+    expect(convertSchema(input)).toEqual({
+      ok: true,
+      schema: {
+        type: 'object',
+        properties: { title: { type: 'string' }, due: { type: 'string', format: 'date-time' } },
+        required: ['title', 'due'],
+      },
+    })
+    const output = z.object({ id: z.string(), createdAt: z.date() })
+    expect(convertSchema(output, 'output')).toMatchObject({
+      ok: true,
+      schema: { properties: { createdAt: { type: 'string', format: 'date-time' } } },
+    })
+  })
+
+  it('explains that an agent cannot send a Zod date that is not coerced', () => {
+    expect(convertSchema(z.object({ due: z.date() }))).toEqual({
+      ok: false,
+      reason: 'A z.date() field cannot come from an agent, because a tool input is JSON. Use z.coerce.date().',
+    })
+  })
+
+  it.each([
+    ['bigint', z.object({ amount: z.bigint() })],
+    ['custom', z.object({ file: z.custom<File>() })],
+    ['map', z.object({ tags: z.map(z.string(), z.string()) })],
+  ])('still reports a Zod %s field that JSON Schema cannot represent', (kind, schema) => {
+    expect(convertSchema(schema)).toEqual({ ok: false, reason: `The Zod type "${kind}" cannot be represented in JSON Schema.` })
+  })
+
+  it('passes library options only to Zod', () => {
+    const calls: unknown[] = []
+    const record = (options: unknown) => {
+      calls.push(options)
+      return { type: 'object' }
+    }
+    const fake = (vendor: string) => ({
+      '~standard': { version: 1, vendor, validate: () => ({ value: {} }), jsonSchema: { input: record, output: record } },
+    })
+    convertSchema(fake('arktype') as never)
+    convertSchema(fake('zod') as never)
+    expect(calls[0]).toEqual({ target: 'draft-2020-12' })
+    expect(calls[1]).toMatchObject({ target: 'draft-2020-12', libraryOptions: { unrepresentable: 'any' } })
   })
 })
 
