@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a change to the API or to the design.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the case that the current design does not cover.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the change. Include the API shape if you have one.
+    validations:
+      required: true
+  - type: input
+    id: documents
+    attributes:
+      label: Affected documents
+      description: Name the file and the section in `documentation/` that the change touches.
+      placeholder: documentation/spec.md, Public API
+  - type: textarea
+    id: trade-offs
+    attributes:
+      label: Trade-offs
+      description: List what the change costs, including any effect on the security defaults.

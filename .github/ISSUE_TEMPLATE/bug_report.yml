@@ -1,0 +1,42 @@
+name: Bug report
+description: Report behavior that differs from the documentation.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: State the actual result and the result you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Link a minimal repository, or paste the smallest code sample that shows the problem.
+    validations:
+      required: true
+  - type: input
+    id: actionmcp-version
+    attributes:
+      label: actionmcp version or commit
+    validations:
+      required: true
+  - type: input
+    id: next-version
+    attributes:
+      label: Next.js and React versions
+      placeholder: next 16.4.6, react 19.3.1
+    validations:
+      required: true
+  - type: input
+    id: consumer
+    attributes:
+      label: Browser or agent
+      description: Name the WebMCP consumer and say whether WebMCP is native or comes from the polyfill.
+      placeholder: Chrome 157 with the origin trial, native
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `actionmcp doctor`
+      render: shell
