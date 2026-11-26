@@ -1,7 +1,7 @@
 # Specification
 
 > Name: `actionmcp` ([ADR-006](decisions.md#adr-006-package-name)).
-> Status: planning. Last reviewed: 2026-11-26.
+> Status: v0.1 is implemented and not published to npm. Last reviewed: 2026-11-26.
 
 ## Pitch
 
@@ -15,7 +15,7 @@
 - human confirmation for consequential actions,
 - integration with the app's own chat through AI SDK.
 
-Target DX (illustrative; the final API is in [spec.md](#product-spec)):
+The API in short (the reference is in [Public API](#public-api-v01)):
 
 ```ts
 // app/actions.ts
@@ -63,7 +63,7 @@ The window is weeks to a few months. The Next.js and AI SDK teams are working on
 Concrete targets for the 30 days after launch:
 
 - at least 3 third-party apps using it (issues, showcases);
-- a benchmark published with raw logs (see [testing.md](testing.md#demo-and-benchmark)).
+- a benchmark published with raw logs (see [testing.md](testing.md#demo-and-benchmark)). The harness exists. No results are published yet.
 
 ## Non-goals
 
@@ -84,7 +84,7 @@ Concrete targets for the 30 days after launch:
 #### v0.1 (MVP, weeks S1–S5)
 
 1. **`agent()`**: wrapper that defines a Server Function as a tool, with Standard Schema validation on the server.
-2. **`defineAgentTools()`**: explicit registry that exposes **existing** actions without changing them. Includes a FormData adapter for `useActionState`-style actions and one for next-safe-action.
+2. **`defineAgentTools()`**: explicit registry that exposes **existing** actions without changing them. Includes FormData adapters for `(previousState, formData)` and `(formData)` actions, and one for next-safe-action.
 3. **JSDoc `@agent`** (experimental, opt-in): marks an exported Server Function with typed parameters. The schema is inferred from the TypeScript types, with no runtime validation (see [Path C](#path-c-jsdoc-agent-experimental-zero-dependencies-no-runtime-validation)).
 4. **`<AgentTools />`** (Server Component): registers the tools in `document.modelContext`. Its scope depends on where it is placed.
 5. **Typed `navigate` tool**, generated from `app/` (opt-in).
@@ -178,7 +178,7 @@ export default defineAgentTools({
 
 #### Path C: JSDoc `@agent` (experimental, zero dependencies, no runtime validation)
 
-Path C is experimental and opt-in in v0.1. If S1 slips, Path C moves to v0.2.
+Path C is experimental and opt-in in v0.1. Enable it with `withAgentTools({ jsdoc: true })`.
 
 ```ts
 'use server'
@@ -191,35 +191,32 @@ export async function renameProject(input: { projectId: string; name: string }) 
 ```
 
 - The schema is inferred from the types during `generate` (`ts-json-schema-generator` with TypeScript 6 pinned).
-- **No runtime validation.** `doctor` emits warning `AT102` when the action does not validate its input. It uses a heuristic: the body does not call `parse`, `safeParse`, `~standard.validate`, or `assert*`.
+- **No runtime validation.** `doctor` emits warning `AT102` when the action does not validate its input. It uses a heuristic: the body does not call `parse`, `safeParse`, `parseAsync`, `safeParseAsync`, `validate`, or `assert*`.
 - Modifiers on the tag line:
   - `@agent`
   - `@agent readonly`
   - `@agent consequential`
   - `@agent untrusted-output`
   - `@agent name=project.rename`
-  - `@agent formdata`
+  - `@agent formdata` (the function takes `(previousState, formData)` or `(formData)`)
+- An unknown modifier is an error (`AT006`).
 
 ### Public API (v0.1)
+
+The declarations below are abridged. The [API reference](api-reference.md) describes each export.
 
 #### `actionmcp/server`
 
 ```ts
-import type { StandardSchemaV1, StandardJSONSchemaV1 } from '@standard-schema/spec'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 
-type AgentSchema<I = unknown, O = I> = StandardSchemaV1<I, O> & StandardJSONSchemaV1<I, O>
-
-export interface AgentToolOptions<I, O> {
-  /** Tool name. Default: the export name. Must match /^[A-Za-z0-9_.-]{1,128}$/. */
+export interface ToolBehaviorOptions {
+  /** Tool name. Default: the export name or the registry key. Must match /^[A-Za-z0-9_.-]{1,128}$/. */
   name?: string
   /** Human-readable label for browser UIs. */
   title?: string
   /** Required. What it does, side effects, what it returns. */
   description: string
-  /** Validated on the server before the handler runs. Omit for no-input tools. */
-  input?: AgentSchema<I>
-  /** Optional output schema (sent as outputSchema). */
-  output?: AgentSchema<O>
   /** Maps to readOnlyHint. Default false. */
   readOnly?: boolean
   /** Maps to consequentialHint. Default: !readOnly. */
@@ -231,43 +228,64 @@ export interface AgentToolOptions<I, O> {
   confirm?: 'always' | 'consequential' | 'never'
 }
 
-/** Returns an async Server Function (valid export of a 'use server' file) with attached metadata. */
-export function agent<I, R>(
-  options: AgentToolOptions<I, unknown>,
-  handler: (input: I) => Promise<R>,
-): ((input: unknown) => Promise<AgentResult<R>>) & AgentToolMarker
+export interface AgentToolOptions extends ToolBehaviorOptions {
+  /** Validated on the server before the handler runs. Omit for no-input tools. */
+  input?: StandardSchemaV1
+  /** Validated on the server after the handler runs, and sent as outputSchema. */
+  output?: StandardSchemaV1
+}
 
-export type AgentResult<R> =
-  | { ok: true; data: R }
-  | { ok: false; error: { code: 'invalid_input' | 'unauthorized' | 'failed'; message: string; issues?: unknown } }
+/** Returns an async Server Function (valid export of a 'use server' file) with attached metadata.
+ *  The handler receives the validated input. A tool without `input` takes no arguments. */
+export function agent<Input extends StandardSchemaV1, Data>(
+  options: ToolBehaviorOptions & { input: Input },
+  handler: (input: StandardSchemaV1.InferOutput<Input>) => Promise<Data>,
+): (input: StandardSchemaV1.InferInput<Input>) => Promise<AgentResult<Data>>
+export function agent<Data>(options: ToolBehaviorOptions, handler: () => Promise<Data>): () => Promise<AgentResult<Data>>
 
-export function tool<A extends (...args: any[]) => Promise<any>>(
-  action: A | AdaptedAction,
-  options: AgentToolOptions<unknown, unknown>,
-): AgentToolDefinition
+export type AgentResult<Data> =
+  | { ok: true; data: Data }
+  | { ok: false; error: { code: AgentErrorCode; message: string; issues?: SchemaIssue[] } }
 
-export function defineAgentTools(tools: Record<string, AgentToolDefinition>): AgentToolRegistry
+/** The library uses the first five codes. A handler can add its own with AgentToolError. */
+export type AgentErrorCode = 'invalid_input' | 'unauthorized' | 'failed' | 'declined' | 'blocked' | (string & {})
 
-/** (prevState, formData) => … → (input) => …, building FormData from the agent input. */
-export function fromFormDataAction(action: (prev: any, fd: FormData) => Promise<any>): AdaptedAction
+export interface SchemaIssue { message: string; path: Array<string | number> }
+
+export function tool(action: ServerFunction | AdaptedAction, options: AgentToolOptions): AgentToolDefinition
+
+/** A value is a tool() definition, or an agent() tool to register under another name. */
+export function defineAgentTools(tools: Record<string, AgentToolDefinition | ServerFunction>): AgentToolRegistry
+
+/** (prevState, formData) => … → the browser builds FormData from the agent input. */
+export function fromFormDataAction(action: (prev: never, formData: FormData) => Promise<unknown>): AdaptedAction
+/** (formData) => … → the same, for a form action with one parameter. */
+export function fromFormAction(action: (formData: FormData) => Promise<unknown>): AdaptedAction
 /** Unwraps { data, serverError, validationErrors } from next-safe-action. */
-export function fromSafeAction(action: (input: any) => Promise<any>): AdaptedAction
+export function fromSafeAction(action: (input: never) => Promise<unknown>): AdaptedAction
 
-/** Thrown by the handler to return a controlled error to the agent. */
+/** Used by the generated registry. */
+export function createRegistry(sources: RegistrySources): AgentToolRegistry
+
+/** Thrown by a handler to return a controlled error to the agent. */
 export class AgentToolError extends Error { constructor(code: string, message: string) }
 ```
+
+`agent()` returns failures as values. A handler that throws `AgentToolError` produces `{ ok: false, error: { code, message } }`. Any other error produces `code: 'failed'` with a generic message in production. Errors that carry a `digest`, such as the one that `redirect()` throws, are rethrown.
 
 #### `actionmcp` (components)
 
 ```ts
 export interface AgentToolsProps {
-  /** Which tools from the registry to register in this subtree. Default: all. */
+  /** Registry to use instead of the generated one. For setups without withAgentTools(). */
+  registry?: AgentToolRegistry
+  /** Which tools from the registry to register in this subtree. Default: all. `*` is a wildcard. */
   include?: string[]
   exclude?: string[]
   /** Prefix for tool names, e.g. 'acme.'. */
   prefix?: string
   /** Register the typed navigate tool. Default: false. */
-  navigate?: boolean | { routes?: string[] /* globs over app routes */ }
+  navigate?: boolean | { routes?: string[] /* globs over route patterns */ }
   /** Passed as-is to registerTool options. */
   exposedTo?: string[]
   /** Load @w3c/webmcp-polyfill if document.modelContext is missing. Default: false. */
@@ -275,20 +293,23 @@ export interface AgentToolsProps {
   /** Renders <meta http-equiv="origin-trial">. Default: process.env.NEXT_PUBLIC_WEBMCP_OT_TOKEN. */
   originTrialToken?: string
 }
-export function AgentTools(props: AgentToolsProps): JSX.Element   // Server Component
+export function AgentTools(props: AgentToolsProps): ReactNode   // Server Component
 
 /** Client-side provider for hooks (functions can't cross from RSC to the client). */
 export function AgentToolsProvider(props: {
-  children: React.ReactNode
+  children: ReactNode
   onBeforeExecute?: (call: ToolCall) => boolean | Promise<boolean>
   onAfterExecute?: (call: ToolCall, result: unknown) => void
-  confirmComponent?: React.ComponentType<ConfirmProps>
-}): JSX.Element
+  confirmComponent?: ComponentType<ConfirmProps>
+}): ReactNode
 
-export function AgentToolsDevtools(): JSX.Element | null            // renders only in development
+export function AgentToolsDevtools(): ReactNode            // renders only in development
 
 export interface ToolCall { name: string; input: unknown; annotations: ToolAnnotations; source: 'agent' }
+export interface ConfirmProps { call: ToolCall; title?: string; description: string; onConfirm: () => void; onCancel: () => void }
 ```
+
+`actionmcp/client` exports `AgentToolsProvider`, `AgentToolsDevtools`, `ConfirmDialog`, and their types. Import from it inside a `'use client'` file, because the root entry also exports the Server Component.
 
 #### `actionmcp/config`
 
@@ -306,6 +327,10 @@ export interface AgentToolsConfig {
   outDir?: string
   /** Enable the experimental @agent JSDoc path (Path C; requires the TS checker). Default: false. */
   jsdoc?: boolean
+  /** Names of the functions that authenticate the caller, for AT105.
+   *  Default: auth, getSession, getServerSession, verifySession, requireUser, requireAuth,
+   *  requireSession, getUser, getCurrentUser, currentUser. */
+  auth?: string[]
 }
 ```
 
@@ -314,25 +339,35 @@ export interface AgentToolsConfig {
 | Command | What it does | Output |
 |---|---|---|
 | `actionmcp generate [--watch]` | Scans, validates, and writes `.agent-tools/registry.ts` and `.agent-tools/manifest.json`. | Exit 1 on `AT0xx` errors |
-| `actionmcp inspect [--json] [tool]` | Lists the tools, their schemas, annotations, source (file:line), and warnings. | Table or JSON |
-| `actionmcp doctor` | Checks Next, React, and validator versions, reserved names, actions without validation, non-exportable schemas, `confirm: 'never'` on consequential tools, and the origin trial token. | List of `ATxxx` codes with their fix |
+| `actionmcp inspect [--json] [tool]` | Lists the tools, their annotations, schema source, source (file:line), and diagnostics. With a tool name, it prints the details and the inferred or declared input schema. | Table or JSON |
+| `actionmcp doctor [--json]` | Runs the project diagnostics and checks the Next.js, React, and validator versions and the origin trial token. | List of `ATxxx` codes with their fix. Exit 1 on errors |
 
-Diagnostic codes (initial list; [security.md](security.md) defines the security codes):
+The CLI reads the `withAgentTools()` options from `next.config`. The flags `--registry`, `--scan` (repeatable), `--out-dir`, `--jsdoc`, and `--cwd` override them.
+
+Diagnostic codes. Every diagnostic has a file, a line, a column, and a suggested fix:
 
 | Code | Level | Meaning |
 |---|---|---|
-| `AT001` | error | Invalid tool name (spec: 1–128 characters, `[A-Za-z0-9_.-]`) |
-| `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, …) |
+| `AT001` | error | Invalid tool name (spec: 1–128 characters, `[A-Za-z0-9_.-]`), or a name that is not a string literal |
+| `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, `navigate`) |
 | `AT003` | error | Empty description |
-| `AT004` | error | `@agent` on a function that is not exported, or in a file without `'use server'` |
-| `AT005` | error | `description` is not a literal (it could come from untrusted data) |
-| `AT101` | warn | Schema cannot be converted to JSON Schema (registered without `inputSchema`) |
+| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
+| `AT005` | error | `description` is not a literal (it could come from untrusted data), or the options are not an object literal |
+| `AT006` | error | Unknown `@agent` modifier |
+| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
+| `AT101` | warn | Schema cannot be converted to JSON Schema (registered without `inputSchema`). For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
 | `AT102` | warn | JSDoc tool without detectable runtime validation |
 | `AT103` | warn | Consequential tool with `confirm: 'never'` |
-| `AT104` | warn | More than 32 tools on one route (the AI SDK example limit; agent-browser truncates at 16) |
-| `AT105` | warn | Action without a detectable call to the configured auth function |
-| `AT106` | warn | Output with free-form strings or UGC without `untrustedOutput` (heuristic) |
-| `AT107` | warn | Input schema with personal fields (`email`, `phone`, `address`, …) that the handler does not use |
+| `AT104` | warn | More than 32 tools (the AI SDK example limit; agent-browser truncates at 16) |
+| `AT105` | warn | Action without a detectable call to a configured auth function. Checked for `agent()` and `@agent` tools. |
+| `AT106` | warn | `output` schema with free-form strings and no `untrustedOutput` (heuristic) |
+| `AT107` | warn | Input schema with personal fields (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |
+| `AT108` | warn | Description shorter than 20 characters |
+| `AT201` | error | Next.js is missing or is not 16.x (`doctor`) |
+| `AT202` | error | React is missing or older than 19.2 (`doctor`) |
+| `AT203` | warn | A validator without Standard JSON Schema support is installed (`doctor`) |
+| `AT204` | warn | The origin trial token is not set (`doctor`) |
+| `AT205` | warn | An adapted action is registered without an `input` schema |
 
 ### Alternatives considered
 
@@ -342,5 +377,5 @@ Diagnostic codes (initial list; [security.md](security.md) defines the security 
 | **`POST /api/agent-tools` dispatcher endpoint** | Duplicates the endpoint, bypasses the Server Actions security model, and creates a generic RPC ([ADR-004](decisions.md#adr-004-execute-through-the-native-server-function-rpc)). |
 | **SWC/Babel plugin** | Turbopack has no webpack plugins. Babel deoptimizes the build. Loaders work file by file with no global view ([ADR-001](decisions.md#adr-001-codegen-instead-of-a-compiler-plugin)). |
 | **Statically parse Zod** | Fragile and incomplete. Standard JSON Schema resolves it at runtime for any validator ([ADR-002](decisions.md#adr-002-standard-schema-first-typescript-types-as-fallback)). |
-| **`useAgentTool()` hook per tool** (like `use-webmcp-tool`) | Already exists (Chrome). Our value is the bridge to the server and automatic generation. We still export it as an escape hatch in v0.2. |
+| **`useAgentTool()` hook per tool** (like `use-webmcp-tool`) | Already exists (Chrome). Our value is the bridge to the server and automatic generation. Planned for v0.2: export one as an escape hatch. |
 | **`AbortSignal` from `usePathname()` in the root layout** | Scoping by composition (where `<AgentTools />` is mounted) is simpler, explicit, and compatible with nested layouts ([ADR-005](decisions.md#adr-005-rsc-registry-and-route-scoping-by-composition)). |
