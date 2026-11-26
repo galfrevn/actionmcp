@@ -270,7 +270,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT101` | warn | A schema cannot be converted to JSON Schema, so the tool is registered without `inputSchema`. For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
 | `AT102` | warn | `@agent` function without detectable runtime validation |
 | `AT103` | warn | Consequential tool with `confirm: 'never'` |
-| `AT104` | warn | More than 32 tools |
+| `AT104` | warn | An `<AgentTools />` registers more than 32 tools, counted from its literal `include` and `exclude`. When the scanned files contain no `<AgentTools />`, the project defines more than 32 tools |
 | `AT105` | warn | `agent()` or `@agent` handler without a call to a configured auth function |
 | `AT106` | warn | `output` schema with free-form strings and no `untrustedOutput` |
 | `AT107` | warn | Input schema with a personal field (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |

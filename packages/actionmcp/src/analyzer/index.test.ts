@@ -197,6 +197,30 @@ export default defineAgentTools({ 'todos.list': list })
     expect(analysis.diagnostics[0]?.message).toContain('33 tools')
   })
 
+  it('counts AT104 per <AgentTools /> from its literal include and exclude', async () => {
+    const tools = (prefix: string, count: number) =>
+      `'use server'\nimport { agent } from 'actionmcp/server'\n${Array.from({ length: count }, (_value, index) => `export const ${prefix}${index} = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })`).join('\n')}\n`
+    const layout = (props: string) =>
+      `import { AgentTools } from 'actionmcp'\nexport default function Layout() { return <AgentTools ${props} /> }\n`
+    const { cwd, write } = setup({
+      'app/alpha/actions.ts': tools('alpha', 20),
+      'app/beta/actions.ts': tools('beta', 20),
+      'app/alpha/layout.tsx': layout(`include={['alpha*']}`),
+      'app/beta/layout.tsx': layout(`include={['beta*']} exclude={['beta1']}`),
+    })
+    expect((await analyze(resolveConfig({}, cwd))).diagnostics).toEqual([])
+
+    write('app/layout.tsx', layout(''))
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.file, diagnostic.line])).toEqual([
+      ['AT104', 'app/layout.tsx', 2],
+    ])
+    expect(analysis.diagnostics[0]?.message).toContain('registers 40 tools')
+
+    write('app/layout.tsx', layout('include={scope}'))
+    expect((await analyze(resolveConfig({}, cwd))).diagnostics).toEqual([])
+  })
+
   it('lists the navigate tool when a layout enables it', async () => {
     const { cwd } = setup({
       'app/layout.tsx':

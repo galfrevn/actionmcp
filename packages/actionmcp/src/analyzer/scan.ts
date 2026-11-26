@@ -4,7 +4,15 @@ import { createDiagnostic, type Diagnostic, type DiagnosticCode } from './diagno
 import { formDataAdapter, parseAgentTag, type AgentTag } from './jsdoc'
 import type { AnalyzedTool } from './model'
 import { readToolOptions } from './options'
-import { collectCalleeNames, collectObjectKeys, collectReferencedNames, hasUseServerDirective, walk, type ParsedModule } from './source'
+import {
+  collectCalleeNames,
+  collectObjectKeys,
+  collectReferencedNames,
+  hasUseServerDirective,
+  staticString,
+  walk,
+  type ParsedModule,
+} from './source'
 
 export interface ScanOptions {
   jsdoc: boolean
@@ -17,12 +25,22 @@ export interface TypeRequest {
   parameterOffset: number
 }
 
+export interface AgentToolsElement {
+  file: string
+  line: number
+  column: number
+  readable: boolean
+  include?: string[]
+  exclude?: string[]
+}
+
 export interface ModuleScan {
   tools: AnalyzedTool[]
   typeRequests: TypeRequest[]
   diagnostics: Diagnostic[]
   usesNavigate: boolean
   plainFunctions: string[]
+  agentToolsElements: AgentToolsElement[]
 }
 
 type AnyFunction = FunctionNode | ArrowFunctionExpression
@@ -67,12 +85,13 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
     componentNames: new Set(),
     declarations: new Map(),
     exports: new Map(),
-    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [] },
+    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [], agentToolsElements: [] },
   }
   indexModule(context)
   scanAgentCalls(context)
   if (options.jsdoc) scanAgentTags(context)
   context.scan.usesNavigate = usesNavigate(context)
+  context.scan.agentToolsElements = agentToolsElements(context)
   context.scan.plainFunctions = plainFunctionExports(context)
   return context.scan
 }
@@ -367,6 +386,36 @@ function checkPersonalFields(keys: Set<string>, handler: AnyFunction, report: Re
 function isPersonalField(key: string): boolean {
   const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_-]+/)
   return words.some((word) => PERSONAL_FIELDS.has(word.toLowerCase()))
+}
+
+function agentToolsElements(context: ModuleContext): AgentToolsElement[] {
+  if (context.componentNames.size === 0) return []
+  const elements: AgentToolsElement[] = []
+  walk(context.module.program, (node) => {
+    if (node.type !== 'JSXOpeningElement') return
+    if (node.name.type !== 'JSXIdentifier' || !context.componentNames.has(node.name.name)) return
+    const element: AgentToolsElement = { ...context.module.locate(node.start), readable: true }
+    for (const attribute of node.attributes) {
+      if (attribute.type !== 'JSXAttribute' || attribute.name.type !== 'JSXIdentifier') {
+        element.readable = false
+        continue
+      }
+      const { name } = attribute.name
+      if (name === 'registry') element.readable = false
+      if (name !== 'include' && name !== 'exclude') continue
+      const patterns = literalStrings(attribute.value)
+      if (patterns === undefined) element.readable = false
+      else element[name] = patterns
+    }
+    elements.push(element)
+  })
+  return elements
+}
+
+function literalStrings(value: Node | null | undefined): string[] | undefined {
+  if (value?.type !== 'JSXExpressionContainer' || value.expression.type !== 'ArrayExpression') return undefined
+  const strings = value.expression.elements.map((element) => staticString(element as Node | null))
+  return strings.every((text) => text !== undefined) ? (strings as string[]) : undefined
 }
 
 function usesNavigate(context: ModuleContext): boolean {

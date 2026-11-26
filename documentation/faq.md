@@ -111,7 +111,7 @@ Use `prefix`: `<AgentTools prefix="acme." />`. actionmcp reserves `snapshot`, `a
 
 ## How many tools should one page register?
 
-Keep it under 32. The AI SDK example rejects more than 32 definitions, and agent-browser truncates long catalogs. `generate` reports `AT104` above that number. Scope tools to the routes that need them with `include` in segment layouts.
+Keep it under 32. The AI SDK example rejects more than 32 definitions, and agent-browser truncates long catalogs. `generate` reports `AT104` for each `<AgentTools />` that registers more than 32 tools, counted from its literal `include` and `exclude`, and `<AgentTools />` logs the same warning in development. Scope tools to the routes that need them with `include` in segment layouts.
 
 ## Can I use it without `withAgentTools()`?
 

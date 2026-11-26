@@ -2,6 +2,7 @@ import { compareText } from '../core/compare'
 import { readFileSync, statSync } from 'node:fs'
 import { join, posix, relative, sep } from 'node:path'
 import { glob } from 'tinyglobby'
+import { createSelector } from '../core/match'
 import { NAVIGATE_TOOL_NAME, describeNameIssue, isReservedToolName, isValidToolName, type NameIssue } from '../core/names'
 import { NAVIGATE_DESCRIPTION } from '../next/routes'
 import { MAX_TOOLS_PER_ROUTE } from '../server/resolve'
@@ -10,7 +11,7 @@ import { createDiagnostic, sortDiagnostics, type Diagnostic } from './diagnostic
 import { scanRegistryModule, type ToolReference } from './explicit'
 import type { AnalysisResult, AnalyzedTool } from './model'
 import { scanRoutes, type PageMetadataCache } from './routes'
-import { mayContainTools, scanModule, type ModuleScan } from './scan'
+import { mayContainTools, scanModule, type AgentToolsElement, type ModuleScan } from './scan'
 import { parseModule, type ParsedModule } from './source'
 import { inferParameterSchemas } from './types'
 
@@ -60,7 +61,13 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
 
   const routes = scanRoutes(config.cwd, cache.pages)
   if (scans.some((scan) => scan.usesNavigate)) tools.push(navigateTool())
-  diagnostics.push(...checkNames(tools), ...checkToolCount(tools))
+  diagnostics.push(
+    ...checkNames(tools),
+    ...checkToolCount(
+      tools,
+      scans.flatMap((scan) => scan.agentToolsElements),
+    ),
+  )
 
   return {
     tools: tools.toSorted((left, right) => compareText(left.name, right.name) || compareText(left.source.file, right.source.file)),
@@ -244,11 +251,22 @@ function nameIssue(name: string, isDuplicate: boolean): NameIssue | undefined {
   return isDuplicate ? { code: 'AT002', name, reason: 'duplicate' } : undefined
 }
 
-function checkToolCount(tools: readonly AnalyzedTool[]): Diagnostic[] {
-  const overflow = tools[MAX_TOOLS_PER_ROUTE]
-  if (!overflow) return []
-  const location = { file: overflow.source.file, line: overflow.source.line, column: 1 }
-  return [createDiagnostic('AT104', location, `${tools.length} tools are defined`)]
+function checkToolCount(tools: readonly AnalyzedTool[], elements: readonly AgentToolsElement[]): Diagnostic[] {
+  const registered = tools.filter((tool) => tool.kind !== 'navigate')
+  if (elements.length === 0) {
+    const overflow = registered[MAX_TOOLS_PER_ROUTE]
+    if (!overflow) return []
+    const location = { file: overflow.source.file, line: overflow.source.line, column: 1 }
+    return [createDiagnostic('AT104', location, `${registered.length} tools are defined`)]
+  }
+  return elements.flatMap((element) => {
+    if (!element.readable) return []
+    const isSelected = createSelector({ include: element.include, exclude: element.exclude })
+    const count = registered.filter((tool) => isSelected(tool.name)).length
+    if (count <= MAX_TOOLS_PER_ROUTE) return []
+    const { file, line, column } = element
+    return [createDiagnostic('AT104', { file, line, column }, `this <AgentTools /> registers ${count} tools`)]
+  })
 }
 
 function toRelative(cwd: string, file: string): string {
