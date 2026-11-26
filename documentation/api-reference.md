@@ -234,6 +234,7 @@ Without flags, the CLI uses the options that `next.config` passes to `withAgentT
 | `AT106` | warn | `output` schema with free-form strings and no `untrustedOutput` |
 | `AT107` | warn | Input schema with a personal field (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |
 | `AT108` | warn | Description shorter than 20 characters |
+| `AT109` | warn | An `agent()` call that is not the value of a top-level `const` or of the default export, so the analyzer cannot register it. List the function in `agent-tools.ts`, or wrap the handler and not the `agent()` call. |
 | `AT201` | error | Next.js is missing or is not 16.x (`doctor`) |
 | `AT202` | error | React is missing or older than 19.2 (`doctor`) |
 | `AT203` | warn | A validator without Standard JSON Schema support is installed (`doctor`) |

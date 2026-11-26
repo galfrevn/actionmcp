@@ -84,6 +84,11 @@ export const DIAGNOSTIC_RULES = {
     summary: 'Description shorter than 20 characters',
     fix: 'Describe what the tool does, its side effects, and what it returns.',
   },
+  AT109: {
+    level: 'warn',
+    summary: 'agent() call that the analyzer cannot register',
+    fix: "Assign the agent() call to an exported const in a 'use server' file, or list the function in agent-tools.ts. To share logic, wrap the handler and not the agent() call.",
+  },
   AT201: {
     level: 'error',
     summary: 'Unsupported Next.js version',

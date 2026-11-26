@@ -61,6 +61,8 @@ Input: the `withAgentTools()` options. Output: the list of tools, the route tabl
 
 An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
 
+The analyzer registers an `agent()` call only when it is the value of a top-level `const` or of the default export. For any other `agent()` call, such as one inside a factory function or one wrapped in another call, it reports `AT109`.
+
 For `@agent` tools, the analyzer loads `ts-json-schema-generator` from the project, and the TypeScript that the generator resolves. It creates a TypeScript program with the project's `tsconfig.json`. The generator produces the schema of the first parameter, with property descriptions from the JSDoc of each property. If the generator is not installed, the analyzer reports `AT206` and the `@agent` tools are left out of the registry. The result is cached in `.agent-tools/cache/types.json` by a hash of the file content and the `tsconfig`. A change in a type that another file declares does not invalidate the cache. Delete the cache file in that case.
 
 Every diagnostic has a code, a file, a line, a column, and a suggested fix. The codes are in the [API reference](api-reference.md#diagnostics).
