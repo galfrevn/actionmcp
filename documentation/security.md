@@ -22,7 +22,7 @@ The guiding principle: exposing a Server Function as a tool must not add attack 
 - **Authentication.** Each action must check the session itself. A tool call arrives with the user's cookies, exactly like a call from your UI.
 - **Authorization and ownership checks.** An action that trusts an ID from its input lets one user change another user's data. This is the same bug with or without actionmcp.
 - **Rate limiting.** An agent in a loop can call a tool many times. Limit expensive actions inside the action.
-- **Deduplicating retries.** An agent that cancels a call after the action started receives `AbortError`, and the action still runs to the end. If the agent retries, the action runs again. Make a consequential action idempotent, for example with a request key in its input that the action stores.
+- **Deduplicating retries.** An agent that cancels a call after the action started receives `AbortError`, and the action still runs to the end. If the agent retries, the action runs again. An agent can also cancel by itself after a time limit, so a person who clicks "Allow" right before that limit causes the same retry. Make a consequential action idempotent, for example with a request key in its input that the action stores.
 - **Defending the agent against prompt injection.** actionmcp marks untrusted output and asks a human before consequential actions. It cannot stop an agent from reading a hostile comment.
 
 ## Checklist for each tool
@@ -56,10 +56,11 @@ A heuristic can miss a problem and can flag correct code. The checklist is the r
 - A long value scrolls inside its own row, so it cannot push the other fields out of view.
 - `confirmLabels` on `AgentToolsProvider` translates the text of the dialog.
 - A cancel, Escape, or a layout that unmounts returns `{ ok: false, error: { code: 'declined' } }` to the agent. The action does not run.
+- An agent that cancels the call closes the dialog, and the action does not run. An agent can cancel after a time limit. agent-browser 0.44.0 cancels a `webmcp invoke` after 25 seconds, unless its `--timeout <ms>` option sets another limit. A person who needs longer to read the dialog sees it close, and a new one opens if the agent calls the tool again.
 - Calls queue behind one dialog, also when several `<AgentTools />` register tools on the same page. Each call needs its own click.
 - You can replace the dialog with `confirmComponent` on `AgentToolsProvider`, and add your own gate with `onBeforeExecute`. A gate that throws blocks the call.
 
-An agent that controls the pointer could click the dialog like a person would. The dialog protects against calls through the tools API, which is the channel that actionmcp adds.
+An agent that controls the pointer could click the dialog like a person would. It could also submit your own forms, which have no dialog. An agent whose call timed out, and that did not receive `declined`, can do that to finish its task. The dialog protects against calls through the tools API, which is the channel that actionmcp adds.
 
 ## Untrusted output
 
