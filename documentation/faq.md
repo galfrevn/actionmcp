@@ -107,6 +107,14 @@ No. Next.js dispatches Server Actions one at a time per client, so a tool call q
 
 If the action has not been called yet, it never runs, and an open confirmation closes. If the action was already called, the agent receives `AbortError` but the action runs to the end, even when it was still waiting in the queue. `onAfterExecute` receives its result, and the devtools panel marks the call "cancelled by the agent". An agent that retries runs the action a second time, so make consequential actions idempotent.
 
+## Why does the confirmation dialog close before anyone answers it?
+
+The agent cancelled the call. An agent can stop waiting for a tool after a time limit. agent-browser 0.44.0 cancels a `webmcp invoke` after 25 seconds, unless its `--timeout <ms>` option sets another limit. The dialog closes, the action does not run, and the agent receives a timeout. The agent can then call the tool again, which opens a new dialog.
+
+A click on "Allow" right before the limit runs the action, and the agent still receives the timeout. If it calls the tool again, the action runs twice. This is one more reason to make consequential actions idempotent.
+
+A timeout does not tell the agent that the person refused. An agent that operates the page can treat it as a failure and submit your own form for the same action, which shows no dialog. `declined` is the result that tells the agent that the person refused.
+
 ## How do I avoid name clashes with other tools on the page?
 
 Use `prefix`: `<AgentTools prefix="acme." />`. actionmcp reserves `snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, and `navigate`. If another library has already registered a name, the tool is registered with a `_2` suffix and a warning is logged in development. Two `<AgentTools />` that register the same tool, such as one in the root layout and one in a segment layout, produce the same suffix, and the warning names both `<AgentTools />`. Use `include` or `exclude` so that one of them registers each tool.
