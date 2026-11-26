@@ -33,7 +33,7 @@ The package is in `packages/actionmcp`. The fixture and example apps import its 
 | `pnpm test:e2e:native` | Playwright with Chromium's native WebMCP |
 | `pnpm test:package` | The packed tarball in an npm project. Needs the network. |
 | `pnpm bench:smoke` | The benchmark harness without a model |
-| `pnpm bench` | Agent evals. Requires `AI_GATEWAY_API_KEY`. |
+| `pnpm bench` | Agent evals. Requires `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY`. |
 
 The test levels and fixtures are in [testing.md](documentation/testing.md).
 

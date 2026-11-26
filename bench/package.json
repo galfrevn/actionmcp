@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@openrouter/ai-sdk-provider": "^3.1.0",
     "agent-browser": "0.44.0",
     "ai": "^7.0.0",
     "zod": "^4.6.7"

@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util'
 import { MAX_STEPS, runAgent, type Mode } from './lib/agent.ts'
 import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser } from './lib/browser.ts'
+import { resolveModel } from './lib/model.ts'
 import { TASKS } from './lib/tasks.ts'
 
 const environmentFile = fileURLToPath(new URL('./.env.local', import.meta.url))
@@ -23,8 +24,9 @@ const { values } = parseArgs({
   },
 })
 
-if (!process.env.AI_GATEWAY_API_KEY) {
-  console.error('Set AI_GATEWAY_API_KEY in the environment or in bench/.env.local to run the benchmark. See bench/README.md.')
+const resolved = resolveModel(values.model)
+if (!resolved) {
+  console.error('Set OPENROUTER_API_KEY or AI_GATEWAY_API_KEY in the environment or in bench/.env.local. See bench/README.md.')
   process.exit(1)
 }
 
@@ -39,6 +41,7 @@ mkdirSync(outDirectory, { recursive: true })
 const version = (args: string[]) => execFileSync('pnpm', args, { encoding: 'utf8' }).trim()
 const environment = {
   model: values.model,
+  provider: resolved.provider,
   maxSteps: MAX_STEPS,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   node: process.version,
@@ -55,7 +58,7 @@ try {
         const seed = resetDatabase()
         const options = { session: `bench-${task.id}-${mode}-${run}`, webmcp: mode === 'webmcp' }
         await browser(options, ['open', APP_URL])
-        const result = await runAgent(values.model, mode, task.prompt, options)
+        const result = await runAgent(resolved.model, mode, task.prompt, options)
         await browser(options, ['close'])
         const success = !result.error && task.verify(readDatabase(), result.answer, seed)
         appendFileSync(outFile, `${JSON.stringify({ type: 'run', task: task.id, mode, run, success, prompt: task.prompt, ...result })}\n`)

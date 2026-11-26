@@ -10,7 +10,7 @@ The harness and the demo app are in this folder. A run needs a model key.
 - **Harness:** [agent-browser](https://github.com/vercel-labs/agent-browser) 0.44.0, the same binary in both modes.
   - `clicks`: agent-browser runs with `--no-webmcp`. The agent has `snapshot`, `open`, `click`, `fill`, `select`, and `press`.
   - `webmcp`: the agent has the same tools plus `webmcp_list` and `webmcp_invoke`.
-- **Model:** one model through the Vercel AI Gateway, with `temperature: 0`.
+- **Model:** one model through OpenRouter or the Vercel AI Gateway, with `temperature: 0`. Both use the same model identifiers, such as `anthropic/claude-sonnet-5.5`.
 - **Tasks:** the five tasks in `lib/tasks.ts`.
 - **Success:** each task has a verifier that reads the database after the run. The agent's answer decides only the read-only task, where the verifier compares it with the owners in the database.
 
@@ -38,15 +38,15 @@ Check the harness without a model. The smoke script performs each task with scri
 pnpm bench:smoke
 ```
 
-Run the benchmark. It needs `AI_GATEWAY_API_KEY`, from the environment or from `bench/.env.local`, which git ignores:
+Run the benchmark. It needs `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY`, from the environment or from `bench/.env.local`, which git ignores. If both are set, OpenRouter is used:
 
 ```bash
-echo 'AI_GATEWAY_API_KEY=your-key' > bench/.env.local
+echo 'OPENROUTER_API_KEY=your-key' > bench/.env.local
 pnpm bench -- --model anthropic/claude-sonnet-5.5 --runs 20
 pnpm --filter actionmcp-bench summarize bench/results/<date>
 ```
 
-`run.ts` appends one JSON line per run to `bench/results/<date>/runs.jsonl`. The first line records the model, the harness commit, and the versions of Node.js, agent-browser, and Next.js. `summarize.ts` writes `summary.md` and `chart.svg` next to it.
+`run.ts` appends one JSON line per run to `bench/results/<date>/runs.jsonl`. The first line records the model, the provider, the harness commit, and the versions of Node.js, agent-browser, and Next.js. `summarize.ts` writes `summary.md` and `chart.svg` next to it.
 
 Options: `--model`, `--runs`, `--tasks invite-member,composite`, `--modes clicks,webmcp`, and `--out <directory>`.
 

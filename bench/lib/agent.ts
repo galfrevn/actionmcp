@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, tool } from 'ai'
+import { generateText, stepCountIs, tool, type LanguageModel } from 'ai'
 import { z } from 'zod'
 import { APP_URL } from './app.ts'
 import { browser, type BrowserOptions } from './browser.ts'
@@ -75,7 +75,7 @@ function webmcpTools(options: BrowserOptions) {
   }
 }
 
-export async function runAgent(model: string, mode: Mode, prompt: string, options: BrowserOptions): Promise<AgentRun> {
+export async function runAgent(model: LanguageModel, mode: Mode, prompt: string, options: BrowserOptions): Promise<AgentRun> {
   const startedAt = performance.now()
   const tools = mode === 'webmcp' ? { ...browserTools(options), ...webmcpTools(options) } : browserTools(options)
   try {
