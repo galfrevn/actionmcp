@@ -9,9 +9,11 @@ import { browser } from './lib/browser.ts'
 import { resolveModel } from './lib/model.ts'
 import { TASKS } from './lib/tasks.ts'
 
-const environmentFile = fileURLToPath(new URL('./.env.local', import.meta.url))
-if (existsSync(environmentFile)) {
-  process.loadEnvFile(environmentFile)
+for (const location of ['./.env.local', './.env', '../.env.local', '../.env']) {
+  const environmentFile = fileURLToPath(new URL(location, import.meta.url))
+  if (existsSync(environmentFile)) {
+    process.loadEnvFile(environmentFile)
+  }
 }
 
 const { values } = parseArgs({
@@ -26,7 +28,7 @@ const { values } = parseArgs({
 
 const resolved = resolveModel(values.model)
 if (!resolved) {
-  console.error('Set OPENROUTER_API_KEY or AI_GATEWAY_API_KEY in the environment or in bench/.env.local. See bench/README.md.')
+  console.error('Set OPENROUTER_API_KEY or AI_GATEWAY_API_KEY in the environment or in a .env file. See bench/README.md.')
   process.exit(1)
 }
 

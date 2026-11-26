@@ -38,10 +38,10 @@ Check the harness without a model. The smoke script performs each task with scri
 pnpm bench:smoke
 ```
 
-Run the benchmark. It needs `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY`, from the environment or from `bench/.env.local`, which git ignores. If both are set, OpenRouter is used:
+Run the benchmark. It needs `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY`, from the environment or from a `.env` or `.env.local` file in `bench/` or in the repository root. Git ignores those files. If both keys are set, OpenRouter is used:
 
 ```bash
-echo 'OPENROUTER_API_KEY=your-key' > bench/.env.local
+echo 'OPENROUTER_API_KEY=your-key' > .env
 pnpm bench -- --model anthropic/claude-sonnet-5.5 --runs 20
 pnpm --filter actionmcp-bench summarize bench/results/<date>
 ```
