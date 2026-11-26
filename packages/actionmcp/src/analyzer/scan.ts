@@ -4,14 +4,7 @@ import { createDiagnostic, type Diagnostic, type DiagnosticCode } from './diagno
 import { formDataAdapter, parseAgentTag, type AgentTag } from './jsdoc'
 import type { AnalyzedTool } from './model'
 import { readToolOptions } from './options'
-import {
-  collectCalleeNames,
-  collectObjectKeys,
-  collectReferencedNames,
-  hasUseServerDirective,
-  walk,
-  type ParsedModule,
-} from './source'
+import { collectCalleeNames, collectObjectKeys, collectReferencedNames, hasUseServerDirective, walk, type ParsedModule } from './source'
 
 export interface ScanOptions {
   jsdoc: boolean
@@ -29,6 +22,7 @@ export interface ModuleScan {
   typeRequests: TypeRequest[]
   diagnostics: Diagnostic[]
   usesNavigate: boolean
+  plainFunctions: string[]
 }
 
 type AnyFunction = FunctionNode | ArrowFunctionExpression
@@ -66,13 +60,25 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
     componentNames: new Set(),
     declarations: new Map(),
     exports: new Map(),
-    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false },
+    scan: { tools: [], typeRequests: [], diagnostics: [], usesNavigate: false, plainFunctions: [] },
   }
   indexModule(context)
   scanAgentCalls(context)
   if (options.jsdoc) scanAgentTags(context)
   context.scan.usesNavigate = usesNavigate(context)
+  context.scan.plainFunctions = plainFunctionExports(context)
   return context.scan
+}
+
+function plainFunctionExports(context: ModuleContext): string[] {
+  const names = new Set<string>()
+  for (const [localName, exportName] of context.exports) {
+    if (asFunction(context.declarations.get(localName))) names.add(exportName)
+  }
+  for (const statement of context.module.program.body) {
+    if (statement.type === 'ExportDefaultDeclaration' && asFunction(statement.declaration)) names.add('default')
+  }
+  return [...names].toSorted()
 }
 
 function indexModule(context: ModuleContext): void {
@@ -297,8 +303,7 @@ function functionName(node: AnyFunction): string | undefined {
 
 function asFunction(node: Node | null | undefined): AnyFunction | undefined {
   if (!node) return undefined
-  const isFunction =
-    node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression'
+  const isFunction = node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression'
   return isFunction ? (node as AnyFunction) : undefined
 }
 
@@ -366,8 +371,7 @@ function usesNavigate(context: ModuleContext): boolean {
     for (const attribute of node.attributes) {
       if (attribute.type !== 'JSXAttribute' || attribute.name.type !== 'JSXIdentifier' || attribute.name.name !== 'navigate') continue
       const value = attribute.value
-      const disabled =
-        value?.type === 'JSXExpressionContainer' && value.expression.type === 'Literal' && value.expression.value === false
+      const disabled = value?.type === 'JSXExpressionContainer' && value.expression.type === 'Literal' && value.expression.value === false
       if (!disabled) found = true
     }
   })

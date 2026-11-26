@@ -41,12 +41,9 @@ describe('isAgentResult', () => {
     expect(isAgentResult(value)).toBe(true)
   })
 
-  it.each([null, 'ok', [], {}, { ok: 'yes' }, { ok: true }, { ok: false }, { ok: false, error: 'x' }])(
-    'rejects %j',
-    (value) => {
-      expect(isAgentResult(value)).toBe(false)
-    },
-  )
+  it.each([null, 'ok', [], {}, { ok: 'yes' }, { ok: true }, { ok: false }, { ok: false, error: 'x' }])('rejects %j', (value) => {
+    expect(isAgentResult(value)).toBe(false)
+  })
 })
 
 describe('isFrameworkSignal', () => {

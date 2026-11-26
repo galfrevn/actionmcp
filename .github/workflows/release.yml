@@ -50,6 +50,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "dist-tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
       - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test

@@ -37,7 +37,8 @@ export function readToolOptions(node: Node | undefined, callOffset: number): Too
   const descriptionText = staticString(description)
   if (descriptionText !== undefined) {
     reading.description = descriptionText
-    if (descriptionText.trim() === '') issues.push({ code: 'AT003', detail: 'the description is empty', offset: description?.start ?? node.start })
+    if (descriptionText.trim() === '')
+      issues.push({ code: 'AT003', detail: 'the description is empty', offset: description?.start ?? node.start })
   } else if (description || hasSpread) {
     issues.push({ code: 'AT005', detail: 'the description is not a string literal', offset: description?.start ?? node.start })
   } else {

@@ -84,9 +84,7 @@ function collectIssues(node: unknown, path: readonly string[]): SchemaIssue[] {
   if (typeof node === 'string') return [{ message: node, path: [...path] }]
   if (Array.isArray(node)) return node.flatMap((item) => collectIssues(item, path))
   if (!isRecord(node)) return []
-  return Object.entries(node).flatMap(([key, value]) =>
-    collectIssues(value, STRUCTURAL_KEYS.has(key) ? path : [...path, key]),
-  )
+  return Object.entries(node).flatMap(([key, value]) => collectIssues(value, STRUCTURAL_KEYS.has(key) ? path : [...path, key]))
 }
 
 const STRUCTURAL_KEYS = new Set(['_errors', 'formErrors', 'fieldErrors'])

@@ -119,6 +119,50 @@ describe('executeTool', () => {
     })
   })
 
+  it('blocks the call and does not run the action when onBeforeExecute throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const tool = createTool({ confirm: 'never' })
+    const runtime = createRuntime({
+      onBeforeExecute: async () => {
+        throw new Error('gate offline')
+      },
+    })
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual(fail('blocked', BLOCKED_MESSAGE))
+    expect(tool.action).not.toHaveBeenCalled()
+    expect(logged).toHaveBeenCalledOnce()
+    logged.mockRestore()
+  })
+
+  it('returns the result of an action that ran when onAfterExecute throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const tool = createTool({ confirm: 'never' })
+    const runtime = createRuntime({
+      onAfterExecute: () => {
+        throw new Error('analytics offline')
+      },
+    })
+    await expect(executeTool(tool, {}, neverAborted(), runtime)).resolves.toEqual({ ok: true, data: { deleted: true } })
+    expect(tool.action).toHaveBeenCalledOnce()
+    expect(logged).toHaveBeenCalledOnce()
+    logged.mockRestore()
+  })
+
+  it('returns the result of an action that ran when a tool call listener throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const records: ToolCallRecord[] = []
+    const unsubscribeFailing = subscribeToToolCalls(() => {
+      throw new Error('panel crashed')
+    })
+    const unsubscribeRecording = subscribeToToolCalls((record) => records.push(record))
+    const tool = createTool({ confirm: 'never' })
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual({ ok: true, data: { deleted: true } })
+    expect(records).toHaveLength(1)
+    expect(logged).toHaveBeenCalledOnce()
+    unsubscribeFailing()
+    unsubscribeRecording()
+    logged.mockRestore()
+  })
+
   it('calls a FormData action with (undefined, FormData)', async () => {
     const action = vi.fn(async (_previous: unknown, formData: FormData) => ({ success: `Invited ${String(formData.get('email'))}` }))
     const tool = createTool({ adapter: 'formdata', confirm: 'never', action })
@@ -151,9 +195,7 @@ describe('executeTool', () => {
 
   it('returns a generic failure when the action throws a non-error', async () => {
     const tool = createTool({ confirm: 'never', action: async () => Promise.reject('nope') })
-    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(
-      fail('failed', GENERIC_FAILURE_MESSAGE),
-    )
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(fail('failed', GENERIC_FAILURE_MESSAGE))
   })
 
   it('lets the runtime recover a thrown error', async () => {

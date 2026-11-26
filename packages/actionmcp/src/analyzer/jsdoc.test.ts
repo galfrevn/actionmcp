@@ -33,7 +33,11 @@ describe('parseAgentTag', () => {
     ['@agent formdata', { formData: true }],
     ['@agent readonly untrusted-output name=todos.list', { readOnly: true, untrustedOutput: true, name: 'todos.list' }],
   ])('parses %s', (line, expected) => {
-    expect(parseAgentTag(comment('List the todos.', line))).toMatchObject({ description: 'List the todos.', unknownModifiers: [], ...expected })
+    expect(parseAgentTag(comment('List the todos.', line))).toMatchObject({
+      description: 'List the todos.',
+      unknownModifiers: [],
+      ...expected,
+    })
   })
 
   it('collects unknown modifiers', () => {

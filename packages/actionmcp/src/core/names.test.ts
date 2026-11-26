@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  RESERVED_TOOL_NAMES,
-  applyPrefix,
-  checkToolNames,
-  describeNameIssue,
-  isReservedToolName,
-  isValidToolName,
-} from './names'
+import { RESERVED_TOOL_NAMES, applyPrefix, checkToolNames, describeNameIssue, isReservedToolName, isValidToolName } from './names'
 
 describe('isValidToolName', () => {
   it.each(['a', 'addTodo', 'team.inviteMember', 'get_cart', 'x-1', 'A'.repeat(128)])('accepts %s', (name) => {

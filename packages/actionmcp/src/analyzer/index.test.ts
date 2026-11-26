@@ -1,4 +1,4 @@
-import { utimesSync } from 'node:fs'
+import { rmSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createProject, type TemporaryProject } from './__fixtures__/project'
@@ -52,7 +52,12 @@ describe('resolveConfig', () => {
   it('finds agent-tools.ts by default and honors explicit values', () => {
     const { cwd } = setup({ 'agent-tools.ts': '', 'tools/registry.ts': '' })
     expect(resolveConfig({}, cwd).registry).toBe(join(cwd, 'agent-tools.ts'))
-    expect(resolveConfig({ registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] }, cwd)).toEqual({
+    expect(
+      resolveConfig(
+        { registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] },
+        cwd,
+      ),
+    ).toEqual({
       cwd,
       registry: join(cwd, 'tools/registry.ts'),
       scan: ['features/**'],
@@ -193,7 +198,8 @@ export default defineAgentTools({ 'todos.list': list })
 
   it('lists the navigate tool when a layout enables it', async () => {
     const { cwd } = setup({
-      'app/layout.tsx': "import { AgentTools } from 'actionmcp'\nexport default function Layout({ children }) { return <html><body>{children}<AgentTools navigate /></body></html> }\n",
+      'app/layout.tsx':
+        "import { AgentTools } from 'actionmcp'\nexport default function Layout({ children }) { return <html><body>{children}<AgentTools navigate /></body></html> }\n",
       'app/page.tsx': PAGE,
       'app/todos/page.tsx': PAGE,
     })
@@ -225,7 +231,6 @@ export default defineAgentTools({ 'todos.list': list })
     const config = resolveConfig({}, cwd)
     const cache = createAnalysisCache()
     expect((await analyze(config, cache)).tools).toHaveLength(4)
-    const { rmSync } = await import('node:fs')
     rmSync(join(cwd, 'lib/extra.ts'))
     expect((await analyze(config, cache)).tools).toHaveLength(2)
     expect(cache.modules.has('lib/extra.ts')).toBe(false)
@@ -233,9 +238,132 @@ export default defineAgentTools({ 'todos.list': list })
   })
 })
 
+describe('registry references', () => {
+  const registry = (imports: string, entries: string) =>
+    `import { defineAgentTools } from 'actionmcp/server'\n${imports}\nexport default defineAgentTools(${entries})\n`
+  const codes = (analysis: Awaited<ReturnType<typeof analyze>>) => analysis.diagnostics.map((diagnostic) => diagnostic.code)
+
+  it('reports AT008 for a plain Server Function that the registry lists without tool()', async () => {
+    const { cwd } = setup({
+      'app/actions.ts': `'use server'\nexport async function plain(input: { id: string }) { return input }\nexport const arrow = async () => 1\n`,
+      'agent-tools.ts': registry(`import { plain, arrow } from './app/actions'`, '{ plain, renamed: arrow }'),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(codes(analysis)).toEqual(['AT008', 'AT008'])
+    expect(hasErrors(analysis.diagnostics)).toBe(true)
+    expect(analysis.diagnostics[0]).toMatchObject({ file: 'agent-tools.ts', line: 3, tool: 'plain' })
+    expect(analysis.diagnostics[0]?.message).toContain('"plain" is a plain function in app/actions.ts')
+    expect(analysis.tools.map((tool) => [tool.name, tool.diagnostics])).toEqual([
+      ['plain', ['AT008']],
+      ['renamed', ['AT008']],
+    ])
+  })
+
+  it('reports AT008 for a default export that is a plain function', async () => {
+    const { cwd } = setup({
+      'app/actions.ts': `'use server'\nexport default async function plain() { return 1 }\n`,
+      'agent-tools.ts': registry(`import plain from './app/actions'`, '{ plain }'),
+    })
+    expect(codes(await analyze(resolveConfig({}, cwd)))).toEqual(['AT008'])
+  })
+
+  it('does not report AT008 for an export that a factory creates or that an alias imports', async () => {
+    const { cwd } = setup({
+      'app/actions.ts': `'use server'\nimport { makeTool } from '../lib/factory'\nexport const made = makeTool('made')\nexport async function plain() { return 1 }\n`,
+      'agent-tools.ts': registry(`import { made } from './app/actions'\nimport { plain } from '@/app/actions'`, '{ made, plain }'),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(codes(analysis)).toEqual([])
+    expect(analysis.tools.map((tool) => tool.name)).toEqual(['made', 'plain'])
+  })
+
+  it('adopts the tool from the imported file when two files export the same name', async () => {
+    const { cwd } = setup({
+      'app/todos/actions.ts': ACTIONS,
+      'app/notes/actions.ts': ACTIONS.replace('List the todos of the signed-in user.', 'List the notes of the signed-in user.'),
+      'agent-tools.ts': registry(
+        `import { listTodos, addTodo } from './app/notes/actions'`,
+        `{ 'notes.list': listTodos, 'notes.add': addTodo }`,
+      ),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(codes(analysis)).toEqual([])
+    expect(analysis.tools.map((tool) => [tool.name, tool.kind, tool.source.file])).toEqual([
+      ['addTodo', 'agent', 'app/todos/actions.ts'],
+      ['listTodos', 'agent', 'app/todos/actions.ts'],
+      ['notes.add', 'explicit', 'app/notes/actions.ts'],
+      ['notes.list', 'explicit', 'app/notes/actions.ts'],
+    ])
+    expect(analysis.tools[3]?.description).toBe('List the notes of the signed-in user.')
+  })
+
+  it('reads an agent() tool that the registry imports from a file outside the scan globs', async () => {
+    const { cwd } = setup({
+      'actions/todos.ts': ACTIONS,
+      'agent-tools.ts': registry(`import { listTodos } from './actions/todos'`, `{ 'todos.list': listTodos }`),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.tools).toEqual([
+      expect.objectContaining({
+        name: 'todos.list',
+        kind: 'explicit',
+        description: 'List the todos of the signed-in user.',
+        source: expect.objectContaining({ file: 'actions/todos.ts', export: 'listTodos' }),
+      }),
+    ])
+    expect(analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.tool])).toEqual([['AT110', 'addTodo']])
+  })
+})
+
+describe('tools outside the scan globs', () => {
+  it('reports AT110 for an exported agent() tool that no scan glob covers', async () => {
+    const { cwd } = setup({ 'app/page.tsx': PAGE, 'actions/todos.ts': ACTIONS })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.tools).toEqual([])
+    expect(
+      analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.level, diagnostic.file, diagnostic.line, diagnostic.tool]),
+    ).toEqual([
+      ['AT110', 'warn', 'actions/todos.ts', 5, 'addTodo'],
+      ['AT110', 'warn', 'actions/todos.ts', 13, 'listTodos'],
+    ])
+    expect(hasErrors(analysis.diagnostics)).toBe(false)
+  })
+
+  it('does not report AT110 when a scan glob covers the file', async () => {
+    const { cwd } = setup({ 'actions/todos.ts': ACTIONS })
+    const analysis = await analyze(resolveConfig({ scan: ['actions/**'] }, cwd))
+    expect(analysis.diagnostics).toEqual([])
+    expect(analysis.tools).toHaveLength(2)
+  })
+
+  it('ignores tests, build output, dependencies, and files that export no tool', async () => {
+    const { cwd } = setup({
+      'actions/todos.test.ts': ACTIONS,
+      'dist/todos.ts': ACTIONS,
+      'node_modules/pkg/todos.ts': ACTIONS,
+      'scripts/local.ts': ACTIONS.replaceAll('export const', 'const'),
+      'scripts/client.ts': ACTIONS.replace(`'use server'\n`, ''),
+      'next.config.ts': `import { withAgentTools } from 'actionmcp/config'\nexport default withAgentTools()({})\n`,
+    })
+    expect((await analyze(resolveConfig({}, cwd))).diagnostics).toEqual([])
+  })
+
+  it('drops the warning in watch mode when the file is removed', async () => {
+    const { cwd } = setup({ 'actions/todos.ts': ACTIONS })
+    const config = resolveConfig({}, cwd)
+    const cache = createAnalysisCache()
+    expect((await analyze(config, cache)).diagnostics).toHaveLength(2)
+    expect(cache.modules.has('actions/todos.ts')).toBe(true)
+    rmSync(join(cwd, 'actions/todos.ts'))
+    expect((await analyze(config, cache)).diagnostics).toEqual([])
+  })
+})
+
 describe('formatDiagnostic', () => {
   it('prints the level, code, location, message, and fix', async () => {
-    const { cwd } = setup({ 'app/actions.ts': `'use server'\nimport { agent } from 'actionmcp/server'\nconst hidden = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })\n` })
+    const { cwd } = setup({
+      'app/actions.ts': `'use server'\nimport { agent } from 'actionmcp/server'\nconst hidden = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })\n`,
+    })
     const [diagnostic] = (await analyze(resolveConfig({}, cwd))).diagnostics
     if (!diagnostic) throw new Error('Expected a diagnostic')
     expect(formatDiagnostic(diagnostic)).toBe(

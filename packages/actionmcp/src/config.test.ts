@@ -41,7 +41,10 @@ describe('applyRegistryAlias', () => {
       resolveAlias: { other: './other.ts', [REGISTRY_ALIAS]: './.agent-tools/registry.ts' },
       resolveExtensions: ['.ts'],
     })
-    const webpackConfig = result.webpack({ resolve: { alias: { existing: '/x' } } }) as unknown as { resolve: { alias: Record<string, string> }; marker: boolean }
+    const webpackConfig = result.webpack({ resolve: { alias: { existing: '/x' } } }) as unknown as {
+      resolve: { alias: Record<string, string> }
+      marker: boolean
+    }
     expect(webpackConfig.resolve.alias).toEqual({ existing: '/x', [REGISTRY_ALIAS]: '/project/.agent-tools/registry.ts' })
     expect(webpackConfig.marker).toBe(true)
     expect(userWebpack).toHaveBeenCalledOnce()
@@ -85,7 +88,9 @@ describe('withAgentTools', () => {
     enter({ 'app/actions.ts': BROKEN })
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const configure = withAgentTools()({})
-    await expect(configure('phase-production-build', context)).rejects.toThrow(/actionmcp found 1 error\(s\)[\s\S]*AT005 app\/actions\.ts:3:44/)
+    await expect(configure('phase-production-build', context)).rejects.toThrow(
+      /actionmcp found 1 error\(s\)[\s\S]*AT005 app\/actions\.ts:3:44/,
+    )
   })
 
   it('prints warnings and continues', async () => {

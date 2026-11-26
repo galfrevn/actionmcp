@@ -34,7 +34,9 @@ describe('the @agent path without ts-json-schema-generator', () => {
     const config = resolveConfig({ jsdoc: true }, project.cwd)
     const analysis = await analyze(config)
 
-    expect(analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.level, diagnostic.file])).toEqual([['AT206', 'error', 'package.json']])
+    expect(analysis.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.level, diagnostic.file])).toEqual([
+      ['AT206', 'error', 'package.json'],
+    ])
     expect(hasErrors(analysis.diagnostics)).toBe(true)
     expect(analysis.tools.map((tool) => [tool.name, tool.schemaSource, tool.diagnostics])).toEqual([
       ['renameA', 'none', ['AT206']],
@@ -67,7 +69,10 @@ describe('the @agent path without ts-json-schema-generator', () => {
     const code = `export async function get(input: { id: number }) { return input }\n`
     project = createProject({ 'tsconfig.json': TSCONFIG, 'app/get.ts': code, 'app/put.ts': code })
     const cacheFile = join(project.cwd, '.agent-tools/cache/types.json')
-    const targets = ['app/get.ts', 'app/put.ts'].map((file) => ({ file: join(project?.cwd ?? '', file), parameterOffset: code.indexOf('input:') }))
+    const targets = ['app/get.ts', 'app/put.ts'].map((file) => ({
+      file: join(project?.cwd ?? '', file),
+      parameterOffset: code.indexOf('input:'),
+    }))
 
     vi.mocked(loadTypeToolchain).mockImplementationOnce(loadInstalled)
     const [cached] = inferParameterSchemas(targets, { cwd: project.cwd, cacheFile })

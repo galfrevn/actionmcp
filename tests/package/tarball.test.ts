@@ -15,7 +15,12 @@ let project: string
 let server: ChildProcess | undefined
 
 function run(command: string, args: string[], cwd: string): string {
-  return execFileSync(command, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' } })
+  return execFileSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+  })
 }
 
 async function waitForServer(url: string, logs: string[]): Promise<string> {

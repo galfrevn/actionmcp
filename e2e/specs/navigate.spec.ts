@@ -26,7 +26,15 @@ test.describe('navigate fixture: typed navigation tool', () => {
     await page.goto(fixtureUrl('navigate'))
     await expectTools(page, ['navigate'])
     const routes = await routeEnum(page, 'navigate')
-    for (const excluded of ['/(marketing)/pricing', '/@modal/login', '/feed/(.)photo', '/_internal', '/api/health', '/projects/[id]', '/docs/[...path]']) {
+    for (const excluded of [
+      '/(marketing)/pricing',
+      '/@modal/login',
+      '/feed/(.)photo',
+      '/_internal',
+      '/api/health',
+      '/projects/[id]',
+      '/docs/[...path]',
+    ]) {
       expect(routes).not.toContain(excluded)
     }
   })

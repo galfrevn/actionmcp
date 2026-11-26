@@ -45,7 +45,9 @@ export function inferParameterSchemas(targets: readonly TypeTarget[], options: I
 
   const toolchain = loadTypeToolchain(toolchainOrigins(options.cwd))
   if (!toolchain) {
-    return targets.map((target, index) => (isCached(target, index) ? cache.get(cacheKey(target))?.inference : undefined) ?? MISSING_TOOLCHAIN)
+    return targets.map(
+      (target, index) => (isCached(target, index) ? cache.get(cacheKey(target))?.inference : undefined) ?? MISSING_TOOLCHAIN,
+    )
   }
   const inferred = inferWithTypeScript(toolchain, missing, options.cwd, tsconfig)
   missing.forEach((target, index) => {
@@ -59,7 +61,9 @@ export function inferParameterSchemas(targets: readonly TypeTarget[], options: I
 
 export function normalizeTypeSchema(schema: Record<string, unknown>): TypeInference {
   const { $schema: _dialect, definitions, ...rest } = schema
-  const renamed = renameDefinitionReferences(isRecord(definitions) && Object.keys(definitions).length > 0 ? { ...rest, $defs: definitions } : rest)
+  const renamed = renameDefinitionReferences(
+    isRecord(definitions) && Object.keys(definitions).length > 0 ? { ...rest, $defs: definitions } : rest,
+  )
   const sanitized = sanitizeJsonSchema(renamed as JsonSchema)
   if (sanitized.type !== 'object') {
     return { ok: false, reason: 'the first parameter is not an object type' }
@@ -91,7 +95,14 @@ function inferWithTypeScript(
     skipLibCheck: true,
   }
   const program = typescript.createProgram([...new Set(targets.map((target) => target.file))], compilerOptions)
-  const config = { ...DEFAULT_CONFIG, expose: 'none' as const, topRef: false, jsDoc: 'extended' as const, additionalProperties: true, skipTypeCheck: true }
+  const config = {
+    ...DEFAULT_CONFIG,
+    expose: 'none' as const,
+    topRef: false,
+    jsDoc: 'extended' as const,
+    additionalProperties: true,
+    skipTypeCheck: true,
+  }
   const generator = new SchemaGenerator(program, createParser(program, config), createFormatter(config), config)
 
   return targets.map((target) => {
@@ -101,7 +112,7 @@ function inferWithTypeScript(
     try {
       return normalizeTypeSchema(generator.createSchemaFromNodes([parameter.type]) as Record<string, unknown>)
     } catch (error) {
-      return { ok: false, reason: error instanceof Error ? error.message.split('\n')[0] ?? error.name : String(error) }
+      return { ok: false, reason: error instanceof Error ? (error.message.split('\n')[0] ?? error.name) : String(error) }
     }
   })
 }

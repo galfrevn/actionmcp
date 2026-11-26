@@ -38,10 +38,7 @@ export interface AgentToolMarker {
   readonly [AGENT_META]: AgentToolMeta
 }
 
-export type AgentTool<Args extends unknown[] = never[], Data = unknown> = ((
-  ...args: Args
-) => Promise<AgentResult<Data>>) &
-  AgentToolMarker
+export type AgentTool<Args extends unknown[] = never[], Data = unknown> = ((...args: Args) => Promise<AgentResult<Data>>) & AgentToolMarker
 
 type InputOf<Schema extends StandardSchemaV1> = StandardSchemaV1.InferInput<Schema>
 type OutputOf<Schema extends StandardSchemaV1> = StandardSchemaV1.InferOutput<Schema>
@@ -90,7 +87,9 @@ async function runHandler(
     const data = await handler(input)
     if (!options.output) return succeed(data)
     const validation = await validateWithSchema(options.output, data)
-    return validation.ok ? succeed(validation.value) : fail('failed', INVALID_OUTPUT_MESSAGE)
+    if (validation.ok) return succeed(validation.value)
+    console.error(`actionmcp: the output of ${describeTool(options)} does not match its output schema.`, validation.issues)
+    return fail('failed', INVALID_OUTPUT_MESSAGE)
   } catch (error) {
     if (isFrameworkSignal(error)) throw error
     if (error instanceof AgentToolError) return fail(error.code, error.message)
@@ -98,4 +97,8 @@ async function runHandler(
     const exposeMessage = process.env.NODE_ENV !== 'production' && error instanceof Error
     return fail('failed', exposeMessage ? error.message : GENERIC_FAILURE_MESSAGE)
   }
+}
+
+function describeTool(options: AgentToolOptions): string {
+  return options.name ? `the tool "${options.name}"` : `the tool described as "${options.description}"`
 }

@@ -1,12 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createSeed, type Database } from '../app/lib/seed.ts'
 
-export const APP_DIRECTORY = fileURLToPath(new URL('../app', import.meta.url))
-export const DATABASE_FILE = fileURLToPath(new URL('../app/.data/db.json', import.meta.url))
-export const APP_PORT = 4400
+export const APP_DIRECTORY = process.env.BENCH_APP_DIRECTORY
+  ? resolvePath(process.env.BENCH_APP_DIRECTORY)
+  : fileURLToPath(new URL('../app', import.meta.url))
+export const DATABASE_FILE = join(APP_DIRECTORY, '.data/db.json')
+export const APP_PORT = Number(process.env.BENCH_PORT ?? 4400)
 export const APP_URL = `http://localhost:${APP_PORT}`
 
 export function resetDatabase(): Database {

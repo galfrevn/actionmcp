@@ -17,6 +17,8 @@
     "test:package": "vitest run --config tests/package/vitest.config.ts",
     "typecheck": "turbo run typecheck && tsc -p e2e/tsconfig.json --noEmit",
     "lint": "oxlint --deny-warnings",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "bench": "pnpm --filter actionmcp-bench start",
     "bench:smoke": "pnpm --filter actionmcp-bench smoke"
   },
@@ -24,6 +26,7 @@
     "@axe-core/playwright": "^4.14.1",
     "@playwright/test": "^1.65.1",
     "@types/node": "^24.19.2",
+    "oxfmt": "0.80.0",
     "oxlint": "^1.95.0",
     "turbo": "^2.11.13",
     "typescript": "~6.0.3",

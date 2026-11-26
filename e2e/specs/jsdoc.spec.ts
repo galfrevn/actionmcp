@@ -29,7 +29,11 @@ test.describe('jsdoc fixture: @agent tags', () => {
             description: 'Who the task is assigned to.',
             anyOf: [
               { type: 'object', properties: { kind: { type: 'string', const: 'user' }, id: { type: 'string' } }, required: ['kind', 'id'] },
-              { type: 'object', properties: { kind: { type: 'string', const: 'team' }, slug: { type: 'string' } }, required: ['kind', 'slug'] },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'team' }, slug: { type: 'string' } },
+                required: ['kind', 'slug'],
+              },
             ],
           },
         },

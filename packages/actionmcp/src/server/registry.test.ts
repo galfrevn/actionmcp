@@ -62,7 +62,12 @@ describe('tool', () => {
     expect(definition.adapter).toBe('formdata')
     expect(definition.action).toBe(inviteTeamMember)
     expect(tool(fromSafeAction(loginUser), { description: 'Sign in.' }).adapter).toBe('safe-action')
-    expect(tool(fromFormAction(async (_formData: FormData) => undefined), { description: 'Post.' }).adapter).toBe('form')
+    expect(
+      tool(
+        fromFormAction(async (_formData: FormData) => undefined),
+        { description: 'Post.' },
+      ).adapter,
+    ).toBe('form')
   })
 
   it('rejects an empty description', () => {
@@ -167,7 +172,10 @@ describe('isAgentToolRegistry', () => {
 
 describe('fromFormDataAction with a (previousState, formData) action', () => {
   const registry = defineAgentTools({
-    inviteTeamMember: tool(fromFormDataAction(inviteTeamMember), { description: 'Invite a person to the team.', input: inviteTeamMemberSchema }),
+    inviteTeamMember: tool(fromFormDataAction(inviteTeamMember), {
+      description: 'Invite a person to the team.',
+      input: inviteTeamMemberSchema,
+    }),
   })
 
   it('builds FormData from the agent input and returns the ActionState', async () => {

@@ -13,8 +13,7 @@ export interface NavigateInput {
 
 const DOT_SEGMENTS = new Set(['.', '..'])
 
-export const NAVIGATE_DESCRIPTION =
-  'Navigate this app to one of its pages. Available tools may change after navigating.'
+export const NAVIGATE_DESCRIPTION = 'Navigate this app to one of its pages. Available tools may change after navigating.'
 
 export function selectRoutes(routes: readonly RouteEntry[], options: NavigateOptions | true): RouteEntry[] {
   if (options === true || !options.routes) {

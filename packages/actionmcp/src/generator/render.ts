@@ -97,7 +97,9 @@ function renderJsdocTool(tool: AnalyzedTool, reference: string): string[] {
 }
 
 function importPath(config: ResolvedConfig, file: string): string {
-  const target = relative(config.outDir, posix.join(config.cwd.split(sep).join('/'), file)).split(sep).join('/')
+  const target = relative(config.outDir, posix.join(config.cwd.split(sep).join('/'), file))
+    .split(sep)
+    .join('/')
   const path = target.replace(IMPORTABLE_EXTENSION, '')
   return path.startsWith('.') ? path : `./${path}`
 }

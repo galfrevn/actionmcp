@@ -39,13 +39,17 @@ export async function runInspect({ config, output }: CommandContext, toolName: s
     return 1
   }
   if (json) {
-    const diagnostics = toolName === undefined ? analysis.diagnostics : analysis.diagnostics.filter((diagnostic) => diagnostic.tool === toolName)
+    const diagnostics =
+      toolName === undefined ? analysis.diagnostics : analysis.diagnostics.filter((diagnostic) => diagnostic.tool === toolName)
     output.write(JSON.stringify({ tools, routes: analysis.routes, diagnostics }, null, 2))
     return 0
   }
   if (toolName !== undefined) {
     for (const tool of tools) describeTool(output, tool)
-    printDiagnostics(output, analysis.diagnostics.filter((diagnostic) => diagnostic.tool === toolName))
+    printDiagnostics(
+      output,
+      analysis.diagnostics.filter((diagnostic) => diagnostic.tool === toolName),
+    )
     return 0
   }
   if (tools.length === 0) {

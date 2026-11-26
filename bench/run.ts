@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { MAX_STEPS, runAgent, type Mode } from './lib/agent.ts'
-import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
+import { APP_PORT, APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser } from './lib/browser.ts'
 import { resolveModel } from './lib/model.ts'
 import { TASKS } from './lib/tasks.ts'
@@ -46,6 +46,7 @@ const environment = {
   provider: resolved.provider,
   maxSteps: MAX_STEPS,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  dirty: execFileSync('git', ['status', '--porcelain', '--', 'bench', 'packages/actionmcp/src'], { encoding: 'utf8' }).trim() !== '',
   node: process.version,
   agentBrowser: version(['exec', 'agent-browser', '--version']),
   next: version(['--filter', 'bench-app', 'exec', 'next', '--version']),
@@ -58,13 +59,15 @@ try {
     for (const mode of modes) {
       for (let run = 1; run <= runs; run += 1) {
         const seed = resetDatabase()
-        const options = { session: `bench-${task.id}-${mode}-${run}`, webmcp: mode === 'webmcp' }
+        const options = { session: `bench-${APP_PORT}-${task.id}-${mode}-${run}`, webmcp: mode === 'webmcp' }
         await browser(options, ['open', APP_URL])
         const result = await runAgent(resolved.model, mode, task.prompt, options)
         await browser(options, ['close'])
         const success = !result.error && task.verify(readDatabase(), result.answer, seed)
         appendFileSync(outFile, `${JSON.stringify({ type: 'run', task: task.id, mode, run, success, prompt: task.prompt, ...result })}\n`)
-        console.log(`${task.id} ${mode} ${run}/${runs} ${success ? 'ok' : 'failed'} ${result.durationMs} ms ${result.inputTokens + result.outputTokens} tokens`)
+        console.log(
+          `${task.id} ${mode} ${run}/${runs} ${success ? 'ok' : 'failed'} ${result.durationMs} ms ${result.inputTokens + result.outputTokens} tokens`,
+        )
       }
     }
   }

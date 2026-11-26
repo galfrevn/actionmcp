@@ -23,7 +23,7 @@ The package is in `packages/actionmcp`. The fixture apps, the examples, and the 
   - execution only through the native Server Function RPC, never through custom endpoints.
 - **Architecture:** `src/core/` does not import `next/*`, `react`, or the other layers. A design decision that changes updates the "Design decisions" section of `documentation/architecture.md` in the same change.
 - **External facts:** the WebMCP draft, browsers, and the AI SDK change often. Check the primary source before you rely on a fact about them.
-- **Tooling:** pnpm, turbo, tsdown, vitest, Playwright, oxlint.
+- **Tooling:** pnpm, turbo, tsdown, vitest, Playwright, oxlint, oxfmt. Run `pnpm format` before you commit.
 - **Do not:**
   - expose actions by default;
   - publish to npm from a local machine. Releases go through the `Release` workflow, as described in the "Releasing" section of `CONTRIBUTING.md`;

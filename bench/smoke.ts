@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
+import { APP_PORT, APP_URL, readDatabase, resetDatabase, startApp } from './lib/app.ts'
 import { browser, browserJson } from './lib/browser.ts'
 import { TASKS } from './lib/tasks.ts'
 
@@ -12,7 +12,7 @@ interface Invocation {
   output: { ok: boolean; data?: unknown; error?: { message: string } }
 }
 
-const options = { session: 'bench-smoke', webmcp: true }
+const options = { session: `bench-smoke-${APP_PORT}`, webmcp: true }
 const invoke = (tool: string, input: Record<string, unknown>) =>
   browserJson<Invocation>(options, ['webmcp', 'invoke', tool, JSON.stringify(input)])
 
@@ -34,7 +34,10 @@ const SCRIPTS: Record<string, () => Promise<string>> = {
   'list-owners': async () => {
     const { output } = await invoke('team.listMembers', {})
     const members = output.data as Array<{ email: string; role: string }>
-    return members.filter((member) => member.role === 'owner').map((member) => member.email).join(', ')
+    return members
+      .filter((member) => member.role === 'owner')
+      .map((member) => member.email)
+      .join(', ')
   },
   composite: async () => {
     const { output } = await invoke('team.listMembers', {})
@@ -50,10 +53,14 @@ const server = await startApp()
 try {
   await browser(options, ['open', `${APP_URL}/team`])
   const { tools } = await browserJson<ToolList>(options, ['webmcp', 'list'])
-  assert.deepEqual(
-    tools.map((tool) => tool.name).toSorted(),
-    ['account.delete', 'account.update', 'navigate', 'team.inviteMember', 'team.listMembers', 'team.removeMember'],
-  )
+  assert.deepEqual(tools.map((tool) => tool.name).toSorted(), [
+    'account.delete',
+    'account.update',
+    'navigate',
+    'team.inviteMember',
+    'team.listMembers',
+    'team.removeMember',
+  ])
   for (const task of TASKS) {
     const seed = resetDatabase()
     const script = SCRIPTS[task.id]

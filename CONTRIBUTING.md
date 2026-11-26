@@ -25,6 +25,7 @@ The package is in `packages/actionmcp`. The fixture and example apps import its 
 | Command | What it runs |
 |---|---|
 | `pnpm lint` | oxlint, including the rule that keeps `src/core` free of framework imports |
+| `pnpm format` | oxfmt over the code and the configuration files. `pnpm format:check` reports unformatted files without writing. |
 | `pnpm typecheck` | TypeScript for the package and the end-to-end specs |
 | `pnpm test` | Unit tests with coverage thresholds |
 | `pnpm test:integration` | `next build` over every fixture, with Turbopack and with webpack |
@@ -40,6 +41,7 @@ The test levels and fixtures are in [testing.md](documentation/testing.md).
 ### Code conventions
 
 - TypeScript, strict mode, ES modules.
+- Format with `pnpm format` before you commit. CI runs `pnpm format:check`.
 - No comments in source files. Names, types, and tests carry the intent. A decision that needs an explanation goes in the "Design decisions" section of `documentation/architecture.md`.
 - `src/core` does not import `next/*`, `react`, or the other layers.
 - Every change comes with tests. A new diagnostic code needs one positive and one negative test.

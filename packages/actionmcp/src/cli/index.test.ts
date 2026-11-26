@@ -172,7 +172,12 @@ describe('actionmcp inspect', () => {
 })
 
 describe('actionmcp doctor', () => {
-  const healthy = { ...installed('next', '16.4.6'), ...installed('react', '19.3.1'), ...installed('zod', '4.6.7'), '.env.local': 'NEXT_PUBLIC_WEBMCP_OT_TOKEN=token\n' }
+  const healthy = {
+    ...installed('next', '16.4.6'),
+    ...installed('react', '19.3.1'),
+    ...installed('zod', '4.6.7'),
+    '.env.local': 'NEXT_PUBLIC_WEBMCP_OT_TOKEN=token\n',
+  }
 
   it('passes on a healthy project', async () => {
     const result = await cli({ ...healthy, 'app/actions.ts': ACTIONS.replace(", confirm: 'never'", '') }, 'doctor')
@@ -191,7 +196,9 @@ describe('actionmcp doctor', () => {
   it('exits 1 on errors and prints JSON with --json', async () => {
     const result = await cli({ ...healthy, 'app/actions.ts': BROKEN }, 'doctor', '--json')
     expect(result.code).toBe(1)
-    expect((JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }).diagnostics.map((diagnostic) => diagnostic.code)).toEqual(['AT005'])
+    expect(
+      (JSON.parse(result.stdout) as { diagnostics: Array<{ code: string }> }).diagnostics.map((diagnostic) => diagnostic.code),
+    ).toEqual(['AT005'])
   })
 })
 
@@ -222,7 +229,12 @@ describe('checkEnvironment', () => {
   })
 
   it('accepts supported validators', () => {
-    const validators = { ...installed('zod', '4.2.0'), ...installed('arktype', '2.1.28'), ...installed('valibot', '1.2.0'), ...installed('@valibot/to-json-schema', '1.8.0') }
+    const validators = {
+      ...installed('zod', '4.2.0'),
+      ...installed('arktype', '2.1.28'),
+      ...installed('valibot', '1.2.0'),
+      ...installed('@valibot/to-json-schema', '1.8.0'),
+    }
     expect(codes({ ...base, ...validators }, token)).toEqual([])
   })
 

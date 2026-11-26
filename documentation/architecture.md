@@ -59,7 +59,9 @@ Input: the `withAgentTools()` options. Output: the list of tools, the route tabl
 3. It reads the registry file (`agent-tools.ts`) statically to list its tools and check their literal options. A registry that it cannot read is an error, so that `inspect` always shows every tool.
 4. It scans `app/` to build the route table for the [navigate tool](#the-navigate-tool).
 
-An `agent()` tool that the registry file lists by reference is registered once, under the registry's name.
+An `agent()` tool that the registry file lists by reference is registered once, under the registry's name. The analyzer follows a relative import of the registry file to find that tool, including a tool in a file outside the `scan` globs. A reference to a plain function is the error `AT008`.
+
+The analyzer also lists the other source files of the project once per process, and reports `AT110` for an exported tool in a file that no `scan` glob covers. In watch mode it checks the same files again and does not list the project again.
 
 The analyzer registers an `agent()` call only when it is the value of a top-level `const` or of the default export. For any other `agent()` call, such as one inside a factory function or one wrapped in another call, it reports `AT109`.
 
@@ -174,7 +176,7 @@ The Client Component registers the definitions on `document.modelContext` with o
 `src/core/execute.ts` runs these steps for each call:
 
 1. **Confirmation.** If `confirm` is `'always'`, or it is `'consequential'` and the tool is consequential, the page shows the confirmation component. The default dialog lists each field of the input with its value. The label of a field is the `title` of its property in the input schema, or the field name. Confirmations queue, so one dialog is visible at a time. If the user cancels, the tool returns `{ ok: false, error: { code: 'declined' } }` and the action does not run.
-2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`.
+2. **Hook.** `onBeforeExecute` from `AgentToolsProvider` runs, if present. `false` returns `{ ok: false, error: { code: 'blocked' } }`, and so does a hook that throws.
 3. **Adapter.** With `formdata`, the input becomes a `FormData` and the call is `action(undefined, formData)`. With `form`, it is `action(formData)`. With `safe-action`, the result is unwrapped.
 4. **Call.** The Server Function reference is called. Next.js sends a POST with the encrypted action ID, checks the origin, and revalidates the UI from the response.
 5. **Result.** Every outcome becomes one envelope, `{ ok: true, data }` or `{ ok: false, error }`. `{ serverError }` and `{ error: string }` become `failed`, `{ validationErrors }` becomes `invalid_input`, and a thrown error becomes `failed`.
@@ -243,7 +245,7 @@ Schemas are evaluated on the server, so the validator never reaches the client b
 
 ### Failures are results, not rejections
 
-Browsers replace every rejected `execute` with `OperationError: Tool execution failed.`. The name and the message of the thrown error do not reach the agent. actionmcp therefore resolves with an envelope for every outcome, so an agent can read validation issues and can tell a declined confirmation from a crash. `execute` rejects only when the consumer cancels the call. When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
+Browsers replace every rejected `execute` with `OperationError: Tool execution failed.`. The name and the message of the thrown error do not reach the agent. actionmcp therefore resolves with an envelope for every outcome, so an agent can read validation issues and can tell a declined confirmation from a crash. `execute` rejects only when the consumer cancels the call. An error in `onAfterExecute`, or in a listener of the devtools panel, is logged and does not change the result of an action that already ran. When a tool declares an `output` schema, the registered `outputSchema` describes the envelope, with the declared schema under `data`.
 
 ### Confirmation by default
 
@@ -255,7 +257,7 @@ No agent guarantees its own confirmation for consequential tools, so the page as
 
 ### `agent()` validates its output
 
-When a tool declares an `output` schema, `agent()` validates the handler's return value on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, removes undeclared fields. If validation fails, the tool returns a `failed` result and none of the data. For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
+When a tool declares an `output` schema, `agent()` validates the handler's return value on the server and returns the validated value. A validator that strips unknown keys, such as a Zod object, removes undeclared fields. If validation fails, the tool returns a `failed` result and none of the data, and logs the message and the path of each issue on the server. For `tool()` and `@agent`, the action runs unchanged, so `output` only describes the result.
 
 ### A thin, owned registration layer
 

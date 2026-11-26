@@ -70,7 +70,17 @@ const rows = groups.map((group) => {
   ]
 })
 
-const header = ['Task', 'Mode', 'Success', 'Tokens (median)', 'Tokens (p90)', 'Time ms (median)', 'Time ms (p90)', 'Tool calls (median)', 'Errors']
+const header = [
+  'Task',
+  'Mode',
+  'Success',
+  'Tokens (median)',
+  'Tokens (p90)',
+  'Time ms (median)',
+  'Time ms (p90)',
+  'Tool calls (median)',
+  'Errors',
+]
 const table = [header, header.map(() => '---'), ...rows].map((row) => `| ${row.join(' | ')} |`).join('\n')
 
 const summary = `# Benchmark summary
@@ -125,7 +135,8 @@ function renderChart(data: readonly Group[]): string {
     ].join('')
   })
   const labels = tasks.map(
-    (task, index) => `<text x="${(margin.left + index * slot + slot / 2).toFixed(1)}" y="${height - 32}" text-anchor="middle">${task}</text>`,
+    (task, index) =>
+      `<text x="${(margin.left + index * slot + slot / 2).toFixed(1)}" y="${height - 32}" text-anchor="middle">${task}</text>`,
   )
   const legend = modes.map(
     (mode, index) =>

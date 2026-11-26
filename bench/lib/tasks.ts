@@ -38,11 +38,7 @@ export const TASKS: Task[] = [
       const unchanged = JSON.stringify(database) === JSON.stringify(seed)
       const owners = seed.members.filter((member) => member.role === 'owner')
       const others = seed.members.filter((member) => member.role !== 'owner')
-      return (
-        unchanged &&
-        owners.every((member) => answer.includes(member.email)) &&
-        !others.some((member) => answer.includes(member.email))
-      )
+      return unchanged && owners.every((member) => answer.includes(member.email)) && !others.some((member) => answer.includes(member.email))
     },
   },
   {

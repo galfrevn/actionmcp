@@ -285,7 +285,9 @@ describe('AgentToolsProvider', () => {
 describe('ConfirmDialog', () => {
   it('labels the dialog with the tool title and description', async () => {
     const call = { name: 'team.invite', input: { email: 'ana@acme.com' }, annotations: createTool().annotations, source: 'agent' as const }
-    await render(<ConfirmDialog call={call} title="Invite member" description="Invite a person." onConfirm={() => {}} onCancel={() => {}} />)
+    await render(
+      <ConfirmDialog call={call} title="Invite member" description="Invite a person." onConfirm={() => {}} onCancel={() => {}} />,
+    )
     const dialog = document.querySelector('dialog')
     const label = document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')
     const description = document.getElementById(dialog?.getAttribute('aria-describedby') ?? '')
@@ -307,8 +309,13 @@ describe('ConfirmDialog', () => {
       annotations: createTool().annotations,
       source: 'agent' as const,
     }
-    const inputSchema = { type: 'object', properties: { email: { type: 'string', title: 'Email address' }, role: { type: 'string', title: ' ' } } }
-    await render(<ConfirmDialog call={call} description="Invite a person." inputSchema={inputSchema} onConfirm={() => {}} onCancel={() => {}} />)
+    const inputSchema = {
+      type: 'object',
+      properties: { email: { type: 'string', title: 'Email address' }, role: { type: 'string', title: ' ' } },
+    }
+    await render(
+      <ConfirmDialog call={call} description="Invite a person." inputSchema={inputSchema} onConfirm={() => {}} onCancel={() => {}} />,
+    )
     const names = [...document.querySelectorAll('dialog dt')].map((element) => element.textContent)
     const values = [...document.querySelectorAll('dialog dd')].map((element) => element.textContent)
     expect(names).toEqual(['Email address', 'role', 'seats', 'tags'])
@@ -317,7 +324,12 @@ describe('ConfirmDialog', () => {
   })
 
   it('renders an input value as text and never as markup', async () => {
-    const call = { name: 'notes.add', input: { text: '<img src=x onerror=alert(1)>' }, annotations: createTool().annotations, source: 'agent' as const }
+    const call = {
+      name: 'notes.add',
+      input: { text: '<img src=x onerror=alert(1)>' },
+      annotations: createTool().annotations,
+      source: 'agent' as const,
+    }
     await render(<ConfirmDialog call={call} description="Add a note." onConfirm={() => {}} onCancel={() => {}} />)
     expect(document.querySelector('dialog img')).toBeNull()
     expect(document.querySelector('dialog dd')?.textContent).toBe('<img src=x onerror=alert(1)>')
@@ -325,18 +337,48 @@ describe('ConfirmDialog', () => {
 
   it('shows an input that is not an object as JSON and leaves out an empty input', async () => {
     const annotations = createTool().annotations
-    await render(<ConfirmDialog call={{ name: 'a', input: [1, 2], annotations, source: 'agent' }} description="Run it." onConfirm={() => {}} onCancel={() => {}} />)
+    await render(
+      <ConfirmDialog
+        call={{ name: 'a', input: [1, 2], annotations, source: 'agent' }}
+        description="Run it."
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
     expect(document.querySelector('[data-actionmcp-confirm-input]')?.textContent).toBe(JSON.stringify([1, 2], null, 2))
-    await render(<ConfirmDialog call={{ name: 'a', input: {}, annotations, source: 'agent' }} description="Run it." onConfirm={() => {}} onCancel={() => {}} />)
+    await render(
+      <ConfirmDialog
+        call={{ name: 'a', input: {}, annotations, source: 'agent' }}
+        description="Run it."
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
     expect(document.querySelector('[data-actionmcp-confirm-input]')).toBeNull()
-    await render(<ConfirmDialog call={{ name: 'a', input: undefined, annotations, source: 'agent' }} description="Run it." onConfirm={() => {}} onCancel={() => {}} />)
+    await render(
+      <ConfirmDialog
+        call={{ name: 'a', input: undefined, annotations, source: 'agent' }}
+        description="Run it."
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
     expect(document.querySelector('[data-actionmcp-confirm-input]')).toBeNull()
   })
 
   it('replaces the labels that it receives and keeps the defaults for the rest', async () => {
     const call = { name: 'team.invite', input: { email: 'ana@acme.com' }, annotations: createTool().annotations, source: 'agent' as const }
     const labels = { title: '¿Permitir «{tool}»?', intro: 'Un agente quiere ejecutar esta acción.', allow: 'Permitir' }
-    await render(<ConfirmDialog call={call} title="Invitar" description="Invita a una persona." labels={labels} onConfirm={() => {}} onCancel={() => {}} />)
+    await render(
+      <ConfirmDialog
+        call={call}
+        title="Invitar"
+        description="Invita a una persona."
+        labels={labels}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
     const dialog = document.querySelector('dialog')
     expect(dialog?.querySelector('h2')?.textContent).toBe('¿Permitir «Invitar»?')
     expect(dialog?.querySelector('p')?.textContent).toBe('Un agente quiere ejecutar esta acción. Invita a una persona.')

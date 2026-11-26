@@ -32,5 +32,10 @@ export function plural(count: number, noun: string): string {
 
 export function table(rows: readonly (readonly string[])[]): string[] {
   const widths = rows.reduce<number[]>((result, row) => row.map((cell, index) => Math.max(result[index] ?? 0, cell.length)), [])
-  return rows.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? 0)).join('  ').trimEnd())
+  return rows.map((row) =>
+    row
+      .map((cell, index) => cell.padEnd(widths[index] ?? 0))
+      .join('  ')
+      .trimEnd(),
+  )
 }

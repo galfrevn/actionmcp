@@ -139,7 +139,7 @@ pnpm --filter example-basic dev
 
 ## Benchmark
 
-[`bench/`](bench/README.md) compares one agent that clicks through a demo app with the same agent calling the WebMCP tools. Two runs are published, with two models and five tasks. With both models the WebMCP mode used fewer tokens on the multi-step task and on the invitation task, and more on the read-only task. On the other two tasks the result depends on the model. The [results](bench/README.md#results) include every run and the limits of the method.
+[`bench/`](bench/README.md) compares one agent that clicks through a demo app with the same agent calling the WebMCP tools. Four runs are published, with three models and five tasks. In all four the WebMCP mode used fewer tokens and less time on the multi-step task, fewer tokens on the invitation task, and more tokens on the read-only task. On the other two tasks it used fewer tokens in three of the four runs. The [results](bench/README.md#results) include every run and the limits of the method.
 
 ## Documentation
 

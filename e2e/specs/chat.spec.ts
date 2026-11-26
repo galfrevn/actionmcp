@@ -115,7 +115,11 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
     const post = (parts: Array<Record<string, unknown>>) =>
       page.evaluate(
         async (body) => {
-          const response = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          })
           await response.body?.cancel()
           return response.status
         },
@@ -137,7 +141,9 @@ test.describe('chat example: in-app assistant over the WebMCP transport', () => 
     await open(page)
     const post = (tools: unknown) =>
       page.evaluate(
-        async (body) => (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).status,
+        async (body) =>
+          (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+            .status,
         { messages: [], tools },
       )
     const definition = (index: number) => ({ name: `tool${index}`, description: 'A tool.', inputSchema: { type: 'object' } })

@@ -53,7 +53,9 @@ describe('scanRegistryModule', () => {
   })
 
   it('finds a registry assigned to a variable', () => {
-    const result = scan(`const registry = defineAgentTools({ ping: tool(loginUser, { description: 'Check that the session is still valid.' }) })\nexport default registry`)
+    const result = scan(
+      `const registry = defineAgentTools({ ping: tool(loginUser, { description: 'Check that the session is still valid.' }) })\nexport default registry`,
+    )
     expect(result.tools.map((tool) => tool.name)).toEqual(['ping'])
   })
 
@@ -85,7 +87,9 @@ describe('scanRegistryModule', () => {
   })
 
   it("reports AT103 for a consequential tool with confirm: 'never'", () => {
-    const result = scan(`export default defineAgentTools({ a: tool(loginUser, { description: 'Delete every project in the team.', confirm: 'never' }) })`)
+    const result = scan(
+      `export default defineAgentTools({ a: tool(loginUser, { description: 'Delete every project in the team.', confirm: 'never' }) })`,
+    )
     expect(codes(result)).toEqual(['AT103'])
   })
 
@@ -94,12 +98,16 @@ describe('scanRegistryModule', () => {
   })
 
   it('reports AT205 for an adapted action without an input schema', () => {
-    const result = scan(`export default defineAgentTools({ invite: tool(fromFormDataAction(inviteTeamMember), { description: 'Invite a person to the current team.' }) })`)
+    const result = scan(
+      `export default defineAgentTools({ invite: tool(fromFormDataAction(inviteTeamMember), { description: 'Invite a person to the current team.' }) })`,
+    )
     expect(codes(result)).toEqual(['AT205'])
     expect(result.tools[0]?.diagnostics).toEqual(['AT205'])
   })
 
   it('does not report AT205 for a plain action without input', () => {
-    expect(codes(scan(`export default defineAgentTools({ ping: tool(loginUser, { description: 'Check that the session is still valid.' }) })`))).toEqual([])
+    expect(
+      codes(scan(`export default defineAgentTools({ ping: tool(loginUser, { description: 'Check that the session is still valid.' }) })`)),
+    ).toEqual([])
   })
 })

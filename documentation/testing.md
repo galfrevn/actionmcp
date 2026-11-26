@@ -32,7 +32,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 
 | Dimension | What CI runs |
 |---|---|
-| Next.js and React | Integration on 16.4 with React 19.3 and on 16.2 with React 19.2. End-to-end on 16.4. A nightly, non-blocking job on `canary`. |
+| Next.js and React | Integration on 16.4 with React 19.3, on 16.2 with React 19.2.9, and on 16.1 and 16.0 with React 19.2.0. End-to-end on 16.4. A nightly, non-blocking job on `canary`. |
 | Bundler | Turbopack and webpack for every fixture |
 | Validators | Zod 4, Valibot with `@valibot/to-json-schema`, and ArkType |
 | Node.js | 22 and 24, for the unit tests and for the end-to-end tests |
@@ -40,7 +40,7 @@ Each fixture is a minimal Next.js app in `fixtures/`.
 
 ## Quality criteria
 
-- At least 85% coverage in `core/`, `server/`, and `generator/`, enforced by the Vitest thresholds.
+- At least 85% coverage in each of `core/`, `server/`, `generator/`, `analyzer/`, `cli/`, `react/`, and `next/`, enforced by the Vitest thresholds.
 - Each diagnostic code has at least one positive and one negative test.
 - A snapshot of the generated `registry.ts` for each fixture, in `tests/integration/__snapshots__`.
 - Budgets, enforced by tests:

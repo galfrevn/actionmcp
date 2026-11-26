@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 140,
+  "semi": false,
+  "singleQuote": true,
+  "sortPackageJson": false,
+  "ignorePatterns": ["pnpm-lock.yaml", "**/__snapshots__/**", "bench/results/**", "**/*.md"]
+}

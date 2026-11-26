@@ -27,7 +27,7 @@ export const DIAGNOSTIC_RULES = {
   AT004: {
     level: 'error',
     summary: 'Tool is not an exported Server Function',
-    fix: 'Export the function from a file that starts with the \'use server\' directive.',
+    fix: "Export the function from a file that starts with the 'use server' directive.",
   },
   AT005: {
     level: 'error',
@@ -43,6 +43,11 @@ export const DIAGNOSTIC_RULES = {
     level: 'error',
     summary: 'Registry file cannot be analyzed',
     fix: 'Default-export defineAgentTools({ ... }) with an object literal whose values are tool(...) calls.',
+  },
+  AT008: {
+    level: 'error',
+    summary: 'Registry entry is not an agent() tool',
+    fix: 'Wrap the function in agent(), or list it with tool(action, { description, input }).',
   },
   AT101: {
     level: 'warn',
@@ -88,6 +93,11 @@ export const DIAGNOSTIC_RULES = {
     level: 'warn',
     summary: 'agent() call that the analyzer cannot register',
     fix: "Assign the agent() call to an exported const in a 'use server' file, or list the function in agent-tools.ts. To share logic, wrap the handler and not the agent() call.",
+  },
+  AT110: {
+    level: 'warn',
+    summary: 'agent() tool in a file that the `scan` globs do not cover',
+    fix: 'Add a glob for the file to the `scan` option of withAgentTools(), move the file under a scanned folder, or list the tool in agent-tools.ts.',
   },
   AT201: {
     level: 'error',
@@ -140,12 +150,7 @@ export interface DiagnosticLocation {
   column: number
 }
 
-export function createDiagnostic(
-  code: DiagnosticCode,
-  location: DiagnosticLocation,
-  detail?: string,
-  tool?: string,
-): Diagnostic {
+export function createDiagnostic(code: DiagnosticCode, location: DiagnosticLocation, detail?: string, tool?: string): Diagnostic {
   const rule: DiagnosticRule = DIAGNOSTIC_RULES[code]
   return {
     code,
