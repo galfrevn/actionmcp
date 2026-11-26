@@ -1,0 +1,51 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      framework:
+        patterns:
+          - next
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      oxc:
+        patterns:
+          - oxlint
+          - oxfmt
+          - oxc-parser
+      test-tooling:
+        patterns:
+          - vitest
+          - '@vitest/*'
+          - '@playwright/test'
+          - '@axe-core/playwright'
+          - jsdom
+      ai-sdk:
+        patterns:
+          - ai
+          - '@ai-sdk/*'
+          - '@openrouter/ai-sdk-provider'
+
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/setup
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - '*'
