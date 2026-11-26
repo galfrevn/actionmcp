@@ -25,6 +25,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The confirmation dialog lists the fields in the order of the input schema, then the fields that the schema does not declare, labeled with the `extra` label of `ConfirmLabels`. A long value scrolls inside its own row. Before, the agent chose the order of the rows and the label of an undeclared field, and a long value could push the other fields out of view.
 - The input schema of the `navigate` tool describes each route with the literal `metadata.title` of its page and the names of its parameters. Before, the agent saw only the patterns.
 - `AT104` counts the tools of each `<AgentTools />` from its literal `include` and `exclude`. Before, it counted every tool of the project, so an app that scoped its tools per layout still got the warning.
+- The analyzer resolves an import of the registry file through the `paths` of `tsconfig.json`, such as `@/app/actions`, so `AT008` also applies to those imports.
 
 ### Fixed
 

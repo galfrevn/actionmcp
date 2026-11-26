@@ -1,6 +1,6 @@
 import { compareText } from '../core/compare'
 import { readFileSync, statSync } from 'node:fs'
-import { join, posix, relative, sep } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { glob } from 'tinyglobby'
 import { createSelector } from '../core/match'
 import { NAVIGATE_TOOL_NAME, describeNameIssue, isReservedToolName, isValidToolName, type NameIssue } from '../core/names'
@@ -14,6 +14,7 @@ import { scanRoutes, type PageMetadataCache } from './routes'
 import { mayContainTools, scanModule, type AgentToolsElement, type ModuleScan } from './scan'
 import { parseModule, type ParsedModule } from './source'
 import { inferParameterSchemas } from './types'
+import { createImportResolver, isFile, type ImportResolver } from './imports'
 
 export interface AnalysisCache {
   modules: Map<string, { stamp: string; scan: ModuleScan | undefined }>
@@ -27,7 +28,6 @@ const PACKAGE_MANIFEST = { file: 'package.json', line: 1, column: 1 }
 const PROJECT_SOURCES = '**/*.{ts,tsx,js,jsx,mts,mjs}'
 const IGNORED_SOURCES = ['**/node_modules/**', '**/.next/**', '**/*.d.ts']
 const IGNORED_OUTSIDE_SCAN = ['**/dist/**', '**/build/**', '**/coverage/**', '**/*.{test,spec}.*']
-const IMPORT_SUFFIXES = ['', '.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '/index.ts', '/index.tsx', '/index.js', '/index.jsx']
 
 export function createAnalysisCache(): AnalysisCache {
   return { modules: new Map(), pages: new Map() }
@@ -44,11 +44,12 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
   resolveTypes(config, scans, diagnostics)
 
   const adopted = new Set<string>()
+  const resolveImport = createImportResolver(config.cwd)
   if (config.registry && registryFile) {
     const module = parseModule(registryFile, readFileSync(config.registry, 'utf8'))
     const registry = scanRegistryModule(module)
     for (const reference of registry.references) {
-      diagnostics.push(...adoptReference(config, module, tools, reference, adopted))
+      diagnostics.push(...adoptReference(config, module, tools, reference, adopted, resolveImport))
     }
     tools.push(...registry.tools)
     diagnostics.push(...registry.diagnostics)
@@ -129,9 +130,10 @@ function adoptReference(
   tools: AnalyzedTool[],
   reference: ToolReference,
   adopted: Set<string>,
+  resolveImport: ImportResolver,
 ): Diagnostic[] {
   const { tool, exportName, importSource } = reference
-  const target = importSource === undefined ? undefined : resolveImport(config.cwd, registry.file, importSource)
+  const target = importSource === undefined ? undefined : resolveImport(registry.file, importSource)
   const matches = tools.filter(
     (candidate) =>
       candidate.kind === 'agent' && candidate.source.export === exportName && (target === undefined || candidate.source.file === target),
@@ -165,17 +167,6 @@ function adoptTool(tool: AnalyzedTool, discovered: AnalyzedTool, adopted: Set<st
 
 function toolKey(file: string, exportName: string): string {
   return `${file}#${exportName}`
-}
-
-function resolveImport(cwd: string, fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.')) return undefined
-  const base = posix.join(posix.dirname(fromFile), specifier)
-  if (base.startsWith('..')) return undefined
-  return IMPORT_SUFFIXES.map((suffix) => `${base}${suffix}`).find((candidate) => isFile(join(cwd, candidate)))
-}
-
-function isFile(path: string): boolean {
-  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false
 }
 
 async function findToolsOutsideScan(

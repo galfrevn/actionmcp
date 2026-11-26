@@ -302,6 +302,17 @@ describe('registry references', () => {
     expect(analysis.tools.map((tool) => tool.name)).toEqual(['made', 'plain'])
   })
 
+  it('resolves a registry import through the paths of tsconfig.json', async () => {
+    const { cwd } = setup({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, moduleResolution: 'bundler', paths: { '@/*': ['./*'] } } }),
+      'app/actions.ts': `'use server'\nexport async function plain() { return 1 }\n`,
+      'agent-tools.ts': registry(`import { plain } from '@/app/actions'`, '{ plain }'),
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(codes(analysis)).toEqual(['AT008'])
+    expect(analysis.diagnostics[0]?.message).toContain('"plain" is a plain function in app/actions.ts')
+  })
+
   it('adopts the tool from the imported file when two files export the same name', async () => {
     const { cwd } = setup({
       'app/todos/actions.ts': ACTIONS,
