@@ -11,7 +11,15 @@ import { createDiagnostic, sortDiagnostics, type Diagnostic } from './diagnostic
 import { scanRegistryModule, type ToolReference } from './explicit'
 import type { AnalysisResult, AnalyzedTool } from './model'
 import { scanRoutes, type PageMetadataCache } from './routes'
-import { mayContainTools, scanModule, type AgentToolsElement, type ModuleScan } from './scan'
+import {
+  mayContainTools,
+  mayReexportAgent,
+  readAgentReexports,
+  scanModule,
+  type AgentToolsElement,
+  type ModuleScan,
+  type ScanOptions,
+} from './scan'
 import { parseModule, type ParsedModule } from './source'
 import { inferParameterSchemas } from './types'
 import { createImportResolver, isFile, type ImportResolver } from './imports'
@@ -20,6 +28,12 @@ export interface AnalysisCache {
   modules: Map<string, { stamp: string; scan: ModuleScan | undefined }>
   pages: PageMetadataCache
   outside?: string[]
+  reexports?: Map<string, { stamp: string; names: string[] }>
+}
+
+interface ScanContext {
+  options: ScanOptions
+  key: string
 }
 
 const SOURCE_FILE = /\.(?:tsx?|jsx?|mts|mjs)$/
@@ -37,24 +51,25 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
   const files = await listSourceFiles(config)
   const registryFile = config.registry ? toRelative(config.cwd, config.registry) : undefined
   const scanned = new Set(files)
-  const scans = files.filter((file) => file !== registryFile).flatMap((file) => scanFile(config, cache, file) ?? [])
+  const resolveImport = createImportResolver(config.cwd)
+  const context = scanContext(config, agentEntries(config, cache, files), resolveImport)
+  const scans = files.filter((file) => file !== registryFile).flatMap((file) => scanFile(config, cache, file, context) ?? [])
 
   const tools = scans.flatMap((scan) => scan.tools)
   const diagnostics = scans.flatMap((scan) => scan.diagnostics)
   resolveTypes(config, scans, diagnostics)
 
   const adopted = new Set<string>()
-  const resolveImport = createImportResolver(config.cwd)
   if (config.registry && registryFile) {
     const module = parseModule(registryFile, readFileSync(config.registry, 'utf8'))
     const registry = scanRegistryModule(module)
     for (const reference of registry.references) {
-      diagnostics.push(...adoptReference(config, module, tools, reference, adopted, resolveImport))
+      diagnostics.push(...adoptReference(config, module, tools, reference, adopted, resolveImport, context.options))
     }
     tools.push(...registry.tools)
     diagnostics.push(...registry.diagnostics)
   }
-  diagnostics.push(...(await findToolsOutsideScan(config, cache, scanned, registryFile, adopted)))
+  diagnostics.push(...(await findToolsOutsideScan(config, cache, scanned, registryFile, adopted, context)))
   const cached = new Set([...files, ...(cache.outside ?? [])])
   for (const file of cache.modules.keys()) {
     if (!cached.has(file)) cache.modules.delete(file)
@@ -88,14 +103,52 @@ async function listSourceFiles(config: ResolvedConfig): Promise<string[]> {
   return files.filter((file) => SOURCE_FILE.test(file)).toSorted()
 }
 
-function scanFile(config: ResolvedConfig, cache: AnalysisCache, file: string): ModuleScan | undefined {
+function agentEntries(config: ResolvedConfig, cache: AnalysisCache, files: readonly string[]): Map<string, ReadonlySet<string>> {
+  const reexports = (cache.reexports ??= new Map())
+  const entries = new Map<string, ReadonlySet<string>>()
+  for (const file of files) {
+    const absolute = join(config.cwd, file)
+    const { mtimeMs, size } = statSync(absolute)
+    const stamp = `${mtimeMs}:${size}`
+    let cached = reexports.get(file)
+    if (cached?.stamp !== stamp) {
+      const code = readFileSync(absolute, 'utf8')
+      cached = { stamp, names: mayReexportAgent(code) ? readAgentReexports(parseModule(file, code)) : [] }
+      reexports.set(file, cached)
+    }
+    if (cached.names.length > 0) entries.set(file, new Set(cached.names))
+  }
+  const listed = new Set(files)
+  for (const file of reexports.keys()) {
+    if (!listed.has(file)) reexports.delete(file)
+  }
+  return entries
+}
+
+function scanContext(
+  config: ResolvedConfig,
+  entries: ReadonlyMap<string, ReadonlySet<string>>,
+  resolveImport: ImportResolver,
+): ScanContext {
+  const options: ScanOptions = { jsdoc: config.jsdoc, auth: config.auth }
+  if (entries.size === 0) return { options, key: '' }
+  const key = [...entries].map(([file, names]) => `${file}=${[...names].join(',')}`).join(';')
+  const resolveAgentNames = (source: string, fromFile: string) => {
+    const target = resolveImport(fromFile, source)
+    return target === undefined ? undefined : entries.get(target)
+  }
+  return { options: { ...options, resolveAgentNames }, key }
+}
+
+function scanFile(config: ResolvedConfig, cache: AnalysisCache, file: string, context: ScanContext): ModuleScan | undefined {
   const absolute = join(config.cwd, file)
   const { mtimeMs, size } = statSync(absolute)
-  const stamp = `${mtimeMs}:${size}:${config.jsdoc}`
+  const stamp = `${mtimeMs}:${size}:${config.jsdoc}:${context.key}`
   let cached = cache.modules.get(file)
   if (cached?.stamp !== stamp) {
     const code = readFileSync(absolute, 'utf8')
-    const scan = mayContainTools(code) ? scanModule(parseModule(file, code), config) : undefined
+    const parse = mayContainTools(code) || (context.key !== '' && code.includes('use server'))
+    const scan = parse ? scanModule(parseModule(file, code), context.options) : undefined
     cached = { stamp, scan }
     cache.modules.set(file, cached)
   }
@@ -131,6 +184,7 @@ function adoptReference(
   reference: ToolReference,
   adopted: Set<string>,
   resolveImport: ImportResolver,
+  options: ScanOptions,
 ): Diagnostic[] {
   const { tool, exportName, importSource } = reference
   const target = importSource === undefined ? undefined : resolveImport(registry.file, importSource)
@@ -146,7 +200,7 @@ function adoptReference(
     return []
   }
   if (target === undefined) return []
-  const scan = scanModule(parseModule(target, readFileSync(join(config.cwd, target), 'utf8')), config)
+  const scan = scanModule(parseModule(target, readFileSync(join(config.cwd, target), 'utf8')), options)
   const outside = scan.tools.find((candidate) => candidate.kind === 'agent' && candidate.source.export === exportName)
   if (outside) {
     const related = scan.diagnostics.filter((diagnostic) => diagnostic.tool !== undefined && diagnostic.tool === outside.name)
@@ -175,12 +229,13 @@ async function findToolsOutsideScan(
   scanned: ReadonlySet<string>,
   registryFile: string | undefined,
   adopted: ReadonlySet<string>,
+  context: ScanContext,
 ): Promise<Diagnostic[]> {
   cache.outside ??= await listOutsideCandidates(config, scanned, registryFile)
   const diagnostics: Diagnostic[] = []
   for (const file of cache.outside) {
     if (scanned.has(file) || !isFile(join(config.cwd, file))) continue
-    for (const tool of scanFile(config, cache, file)?.tools ?? []) {
+    for (const tool of scanFile(config, cache, file, context)?.tools ?? []) {
       const isServerFunction = tool.source.export !== '' && !tool.diagnostics.includes('AT004')
       if (!isServerFunction || adopted.has(toolKey(file, tool.source.export))) continue
       diagnostics.push(createDiagnostic('AT110', { file, line: tool.source.line, column: 1 }, `"${tool.name}"`, tool.name))

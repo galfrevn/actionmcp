@@ -15,6 +15,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The `cwd` option of `withAgentTools()`, for `next build apps/web` and other runs from outside the project directory. `withAgentTools()` warns when the project directory has no `app` or `src/app` directory. Before, such a run analyzed the directory where `next` ran and found no tools, with no message.
 - The `initialState` option of `fromFormDataAction()`, the previous state that the browser passes to the action. Before, the action always received `undefined`, so an action that read `previousState` failed.
 - In development, `<AgentTools />` warns once when the page is not a secure context, such as `http://192.168.1.20:3000`, because WebMCP and the polyfill do not exist there.
+- The analyzer registers `agent()` tools whose `agent` comes from a scanned module that re-exports it, such as `lib/agent.ts` with `export { agent } from 'actionmcp/server'`, imported with a relative path or a `paths` alias. Before, those tools were left out with no message.
 
 ### Changed
 

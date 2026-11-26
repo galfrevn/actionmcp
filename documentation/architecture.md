@@ -52,9 +52,9 @@ actionmcp/
 
 Input: the `withAgentTools()` options. Output: the list of tools, the route table, and the diagnostics.
 
-1. It walks the `scan` globs and skips `node_modules`, `.next`, and the output folder. It parses, with `oxc-parser`, only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`.
+1. It walks the `scan` globs and skips `node_modules`, `.next`, and the output folder. It parses, with `oxc-parser`, only the files whose text mentions `actionmcp/server`, `@agent`, or `AgentTools`. When a scanned module re-exports `agent` from `actionmcp/server`, as in `export { agent } from 'actionmcp/server'`, it also parses the files with `'use server'`.
 2. In each parsed file it looks for:
-   - exported `agent()` calls, resolving the import from `actionmcp/server` and its aliases;
+   - exported `agent()` calls, resolving the import from `actionmcp/server` and its aliases, or from a scanned module that re-exports `agent` under any name. It resolves the import of such a module when it is relative or matches the `paths` of `tsconfig.json`;
    - exported functions whose JSDoc has the `@agent` tag, when `jsdoc` is enabled.
 3. It reads the registry file (`agent-tools.ts`) statically to list its tools and check their literal options. A registry that it cannot read is an error, so that `inspect` always shows every tool.
 4. It scans `app/` to build the route table for the [navigate tool](#the-navigate-tool).

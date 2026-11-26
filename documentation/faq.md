@@ -71,6 +71,8 @@ Yes. Pass `confirmLabels` to `AgentToolsProvider`. The [API reference](api-refer
 
 The analyzer registers an `agent()` call only when it is the value of an exported top-level `const` or of the default export. A call inside a factory function, or wrapped in another call, produces the `AT109` warning and no tool. Wrap the handler and keep `agent()` at the top level, or list the function that your factory returns in `agent-tools.ts`.
 
+A module of your own that re-exports `agent`, such as `lib/agent.ts` with `export { agent } from 'actionmcp/server'`, works when the analyzer scans it and the action imports it with a relative path or a `paths` alias of `tsconfig.json`. A function of your own that calls `agent()` inside it does not, because the analyzer reads only the call that it sees.
+
 The analyzer also reads only the files that the `scan` globs cover, which are `app/**`, `lib/**`, and `src/**` by default. A tool in another folder, such as `actions/`, produces the `AT110` warning and no tool. Add the folder to the `scan` option of `withAgentTools()`.
 
 ## Which validators work?

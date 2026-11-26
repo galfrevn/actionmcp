@@ -17,6 +17,7 @@ import {
 export interface ScanOptions {
   jsdoc: boolean
   auth: readonly string[]
+  resolveAgentNames?: ((source: string, fromFile: string) => ReadonlySet<string> | undefined) | undefined
 }
 
 export interface TypeRequest {
@@ -50,7 +51,7 @@ interface ModuleContext {
   options: ScanOptions
   useServer: boolean
   agentNames: Set<string>
-  namespaces: Set<string>
+  namespaces: Map<string, ReadonlySet<string>>
   componentNames: Set<string>
   declarations: Map<string, Node>
   exports: Map<string, string>
@@ -58,6 +59,8 @@ interface ModuleContext {
 }
 
 const SERVER_ENTRY = 'actionmcp/server'
+const SERVER_AGENT_EXPORTS: ReadonlySet<string> = new Set(['agent'])
+const AGENT_REEXPORT = /export\s*\*\s*from\s*['"]actionmcp\/server['"]|export\s*\{[^}]*\bagent\b/
 const COMPONENT_ENTRIES = ['actionmcp', 'actionmcp/client']
 const MIN_DESCRIPTION_LENGTH = 20
 const UNSUPPORTED_SERVER_FILE = /\.mts$/
@@ -71,6 +74,33 @@ function serverFileProblem(context: ModuleContext): string {
     : "the file has no 'use server' directive"
 }
 
+export function mayReexportAgent(code: string): boolean {
+  return code.includes(SERVER_ENTRY) && AGENT_REEXPORT.test(code)
+}
+
+export function readAgentReexports(module: ParsedModule): string[] {
+  const locals = new Set<string>()
+  const exported = new Set<string>()
+  for (const statement of module.program.body) {
+    if (statement.type === 'ImportDeclaration' && statement.source.value === SERVER_ENTRY) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ImportSpecifier' && importedName(specifier.imported) === 'agent') locals.add(specifier.local.name)
+      }
+    } else if (statement.type === 'ExportAllDeclaration' && statement.source.value === SERVER_ENTRY && !statement.exported) {
+      exported.add('agent')
+    } else if (statement.type === 'ExportNamedDeclaration' && !statement.declaration) {
+      const fromServer = statement.source?.value === SERVER_ENTRY
+      for (const specifier of statement.specifiers) {
+        const local = importedName(specifier.local)
+        const name = importedName(specifier.exported)
+        if (local === undefined || name === undefined) continue
+        if ((fromServer && local === 'agent') || (!statement.source && locals.has(local))) exported.add(name)
+      }
+    }
+  }
+  return [...exported].toSorted()
+}
+
 export function mayContainTools(code: string): boolean {
   return code.includes(SERVER_ENTRY) || code.includes('@agent') || code.includes('AgentTools')
 }
@@ -81,7 +111,7 @@ export function scanModule(module: ParsedModule, options: ScanOptions): ModuleSc
     options,
     useServer: hasUseServerDirective(module.program) && !UNSUPPORTED_SERVER_FILE.test(module.file),
     agentNames: new Set(),
-    namespaces: new Set(),
+    namespaces: new Map(),
     componentNames: new Set(),
     declarations: new Map(),
     exports: new Map(),
@@ -131,10 +161,11 @@ function indexModule(context: ModuleContext): void {
 
 function indexImport(context: ModuleContext, statement: Extract<Statement, { type: 'ImportDeclaration' }>): void {
   const source = statement.source.value
+  const agentExports = source === SERVER_ENTRY ? SERVER_AGENT_EXPORTS : context.options.resolveAgentNames?.(source, context.module.file)
   for (const specifier of statement.specifiers) {
-    if (source === SERVER_ENTRY) {
-      if (specifier.type === 'ImportNamespaceSpecifier') context.namespaces.add(specifier.local.name)
-      else if (specifier.type === 'ImportSpecifier' && importedName(specifier.imported) === 'agent') {
+    if (agentExports) {
+      if (specifier.type === 'ImportNamespaceSpecifier') context.namespaces.set(specifier.local.name, agentExports)
+      else if (specifier.type === 'ImportSpecifier' && agentExports.has(importedName(specifier.imported) ?? '')) {
         context.agentNames.add(specifier.local.name)
       }
     } else if (COMPONENT_ENTRIES.includes(source)) {
@@ -173,9 +204,8 @@ function isAgentCall(context: ModuleContext, node: Node | null | undefined): nod
   return (
     callee.type === 'MemberExpression' &&
     callee.object.type === 'Identifier' &&
-    context.namespaces.has(callee.object.name) &&
     callee.property.type === 'Identifier' &&
-    callee.property.name === 'agent'
+    context.namespaces.get(callee.object.name)?.has(callee.property.name) === true
   )
 }
 

@@ -263,6 +263,50 @@ export default defineAgentTools({ 'todos.list': list })
   })
 })
 
+describe('agent() re-exported from a project module', () => {
+  const action = (source: string, call = 'agent') =>
+    `'use server'\nimport { ${call} } from '${source}'\nexport const addNote = ${call}({ description: 'Add a note for the signed-in user.' }, async () => { await requireUser() })\n`
+
+  it.each([
+    ['a relative import of a named re-export', `export { agent } from 'actionmcp/server'\n`, action('../../lib/agent')],
+    ['a path alias of a named re-export', `export { agent } from 'actionmcp/server'\n`, action('@/lib/agent')],
+    ['a re-export of every export', `export * from 'actionmcp/server'\n`, action('@/lib/agent')],
+    ['a renamed re-export', `export { agent as defineTool } from 'actionmcp/server'\n`, action('@/lib/agent', 'defineTool')],
+    ['an imported binding that the module exports', `import { agent } from 'actionmcp/server'\nexport { agent }\n`, action('@/lib/agent')],
+    [
+      'a namespace import',
+      `export { agent } from 'actionmcp/server'\n`,
+      `'use server'\nimport * as tools from '@/lib/agent'\nexport const addNote = tools.agent({ description: 'Add a note for the signed-in user.' }, async () => { await requireUser() })\n`,
+    ],
+  ])('registers a tool through %s', async (_label, reexport, code) => {
+    const { cwd } = setup({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, moduleResolution: 'bundler', paths: { '@/*': ['./*'] } } }),
+      'lib/agent.ts': reexport,
+      'app/notes/actions.ts': code,
+    })
+    const analysis = await analyze(resolveConfig({}, cwd))
+    expect(analysis.diagnostics).toEqual([])
+    expect(analysis.tools.map((tool) => [tool.name, tool.source.file])).toEqual([['addNote', 'app/notes/actions.ts']])
+  })
+
+  it('does not treat another export of the module as agent()', async () => {
+    const { cwd } = setup({
+      'lib/agent.ts': `export { agent } from 'actionmcp/server'\nexport function wrap<T>(value: T) { return value }\n`,
+      'app/notes/actions.ts': action('../../lib/agent', 'wrap'),
+    })
+    expect((await analyze(resolveConfig({}, cwd))).tools).toEqual([])
+  })
+
+  it('analyzes again when a module starts to re-export agent()', async () => {
+    const { cwd, write } = setup({ 'lib/agent.ts': `export const agent = () => null\n`, 'app/notes/actions.ts': action('../../lib/agent') })
+    const config = resolveConfig({}, cwd)
+    const cache = createAnalysisCache()
+    expect((await analyze(config, cache)).tools).toEqual([])
+    write('lib/agent.ts', `export { agent } from 'actionmcp/server'\n`)
+    expect((await analyze(config, cache)).tools.map((tool) => tool.name)).toEqual(['addNote'])
+  })
+})
+
 describe('registry references', () => {
   const registry = (imports: string, entries: string) =>
     `import { defineAgentTools } from 'actionmcp/server'\n${imports}\nexport default defineAgentTools(${entries})\n`
