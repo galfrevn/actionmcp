@@ -2,7 +2,7 @@
 
 This project follows [Semantic Versioning](https://semver.org). While the version is 0.x, a minor release can contain breaking changes.
 
-## Unreleased
+## 0.3.0
 
 ### Added
 
