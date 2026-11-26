@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { agent } from './agent'
 import { createRegistry, defineAgentTools, tool } from './registry'
-import { resolveTools, selectTools, wrapOutputSchema } from './resolve'
+import { resolveTools, selectOrigins, selectTools, wrapOutputSchema } from './resolve'
 
 const action = async () => undefined
 
@@ -134,5 +134,24 @@ describe('wrapOutputSchema', () => {
     const data = { type: 'object', properties: { id: { type: 'number' } } }
     const schema = wrapOutputSchema(data)
     expect(schema).toMatchObject({ type: 'object', required: ['ok'], properties: { ok: { type: 'boolean' }, data } })
+  })
+})
+
+describe('selectOrigins', () => {
+  it('keeps trustworthy origins and an absent list', () => {
+    expect(selectOrigins(undefined)).toBeUndefined()
+    expect(selectOrigins(['https://agent.example', 'http://localhost:3001'])).toEqual(['https://agent.example', 'http://localhost:3001'])
+  })
+
+  it('throws on an origin that the browser would refuse in development', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(() => selectOrigins(['agent.example'])).toThrow('exposedTo needs origins')
+  })
+
+  it('warns and leaves out the refused origins in production', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(selectOrigins(['agent.example', 'https://agent.example'])).toEqual(['https://agent.example'])
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"agent.example"'))
   })
 })

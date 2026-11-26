@@ -10,6 +10,7 @@ This project follows [Semantic Versioning](https://semver.org). While the versio
 - The `AT110` warning for an exported `agent()` or `@agent` tool in a file that the `scan` globs do not cover. Before, the tool was left out with no message.
 - `agent()` logs the issues on the server when the return value of a handler does not match the `output` schema.
 - In development, `<AgentTools />` logs each tool that the browser refuses to register, with the error. Before, a refused registration left no trace.
+- `<AgentTools />` checks each `exposedTo` origin. An origin that the browser would refuse, such as `agent.example` without a scheme, throws in development and is left out with a warning in production. Before, the browser refused every tool of that `<AgentTools />` and nothing was logged.
 
 ### Changed
 

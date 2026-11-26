@@ -1,5 +1,6 @@
 import { createSelector } from '../core/match'
 import { applyPrefix, checkToolNames, describeNameIssue } from '../core/names'
+import { isTrustworthyOrigin } from '../core/origins'
 import { convertSchema } from '../core/schema'
 import type { JsonSchema, SerializableToolDef } from '../core/types'
 import type { AgentToolRegistry, RegistryEntry } from './registry'
@@ -37,6 +38,16 @@ export function selectTools(registry: AgentToolRegistry, selection: ToolSelectio
   console.warn(`actionmcp: ${message}`)
   const rejected = new Set(issues.map((issue) => issue.name))
   return tools.filter((tool) => !rejected.has(tool.name))
+}
+
+export function selectOrigins(origins: readonly string[] | undefined): string[] | undefined {
+  if (!origins) return undefined
+  const rejected = origins.filter((origin) => !isTrustworthyOrigin(origin))
+  if (rejected.length === 0) return [...origins]
+  const message = `actionmcp: exposedTo needs origins with https:, or http: on localhost, such as "https://agent.example". The browser would refuse every tool for ${rejected.map((origin) => JSON.stringify(origin)).join(', ')}.`
+  if (process.env.NODE_ENV !== 'production') throw new Error(message)
+  console.warn(`${message} They are left out.`)
+  return origins.filter(isTrustworthyOrigin)
 }
 
 export function wrapOutputSchema(data: JsonSchema): JsonSchema {

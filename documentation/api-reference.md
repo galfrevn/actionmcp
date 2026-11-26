@@ -129,11 +129,11 @@ A Server Component that registers tools while it is mounted.
 | `prefix` | `string` | none | Prepended to every name, including `navigate`. |
 | `navigate` | `boolean` or `{ routes?: string[] }` | `false` | Registers the navigation tool. See below. |
 | `polyfill` | `boolean` | `false` | Loads `@w3c/webmcp-polyfill` when `document.modelContext` is missing. |
-| `exposedTo` | `string[]` | none | Origins passed to `registerTool`, for tools in cross-origin frames. |
+| `exposedTo` | `string[]` | none | Origins passed to `registerTool`, for tools in cross-origin frames. Each origin needs `https:`, or `http:` on `localhost` or a loopback address, as in `https://agent.example`. |
 | `originTrialToken` | `string` | `NEXT_PUBLIC_WEBMCP_OT_TOKEN` | Renders `<meta http-equiv="origin-trial">`. |
 | `registry` | `AgentToolRegistry` | the generated registry | For setups without `withAgentTools()`. |
 
-In development, an invalid, reserved, or duplicate name throws. In production it logs a warning and the tool is skipped.
+In development, an invalid, reserved, or duplicate name throws. In production it logs a warning and the tool is skipped. An `exposedTo` origin that the browser would refuse, such as `agent.example` without a scheme, follows the same rule: it throws in development, and in production it is left out with a warning.
 
 ### The `navigate` tool
 
