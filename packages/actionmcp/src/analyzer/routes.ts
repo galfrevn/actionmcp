@@ -1,3 +1,4 @@
+import { compareText } from '../core/compare'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RouteEntry } from '../core/types'
@@ -20,7 +21,7 @@ export function scanRoutes(cwd: string): RouteEntry[] {
   if (!appDirectory) return []
   const routes = new Map<string, RouteEntry>()
   visit(appDirectory, [], routes)
-  return [...routes.values()].toSorted((left, right) => left.pattern.localeCompare(right.pattern))
+  return [...routes.values()].toSorted((left, right) => compareText(left.pattern, right.pattern))
 }
 
 function visit(directory: string, segments: readonly string[], routes: Map<string, RouteEntry>): void {

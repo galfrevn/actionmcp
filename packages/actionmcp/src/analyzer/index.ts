@@ -1,3 +1,4 @@
+import { compareText } from '../core/compare'
 import { readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { glob } from 'tinyglobby'
@@ -47,7 +48,7 @@ export async function analyze(config: ResolvedConfig, cache: AnalysisCache = cre
   diagnostics.push(...checkNames(tools), ...checkToolCount(tools))
 
   return {
-    tools: tools.toSorted((left, right) => left.name.localeCompare(right.name) || left.source.file.localeCompare(right.source.file)),
+    tools: tools.toSorted((left, right) => compareText(left.name, right.name) || compareText(left.source.file, right.source.file)),
     routes,
     diagnostics: sortDiagnostics(diagnostics),
     registry: registryFile,

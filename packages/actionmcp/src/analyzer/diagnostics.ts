@@ -1,3 +1,5 @@
+import { compareText } from '../core/compare'
+
 export type DiagnosticLevel = 'error' | 'warn'
 
 export interface DiagnosticRule {
@@ -157,6 +159,6 @@ export function formatDiagnostic(diagnostic: Diagnostic): string {
 export function sortDiagnostics(diagnostics: readonly Diagnostic[]): Diagnostic[] {
   return diagnostics.toSorted(
     (left, right) =>
-      left.file.localeCompare(right.file) || left.line - right.line || left.column - right.column || left.code.localeCompare(right.code),
+      compareText(left.file, right.file) || left.line - right.line || left.column - right.column || compareText(left.code, right.code),
   )
 }

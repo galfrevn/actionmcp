@@ -1,3 +1,4 @@
+import { compareText } from '../core/compare'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -150,7 +151,7 @@ function readCache(cacheFile: string | undefined): Map<string, CacheEntry> {
 function writeCache(cacheFile: string | undefined, cache: Map<string, CacheEntry>, targets: readonly TypeTarget[]): void {
   if (!cacheFile) return
   const live = new Set(targets.map(cacheKey))
-  const entries = [...cache].filter(([key]) => live.has(key)).toSorted(([left], [right]) => left.localeCompare(right))
+  const entries = [...cache].filter(([key]) => live.has(key)).toSorted(([left], [right]) => compareText(left, right))
   mkdirSync(dirname(cacheFile), { recursive: true })
   writeFileSync(cacheFile, `${JSON.stringify(Object.fromEntries(entries), null, 2)}\n`)
 }
