@@ -2,6 +2,20 @@
 
 Each task has an ID, its dependencies, and acceptance criteria (AC). An agent can take any task whose dependencies are closed. Week estimates are approximate: the priority is to ship quickly (see [Risks](#risks)).
 
+## Status
+
+Last updated: 2026-11-26.
+
+| Stage | Status |
+|---|---|
+| S0 spikes | SP1 to SP5 are verified. SP6 is open: it needs a manual session in ChatGPT Desktop. SP7 is partial. See [Spike results](#spike-results). |
+| S1 server core and analyzer | Done (T1.1 to T1.8). |
+| S2 browser runtime and navigation | Done (T2.1 to T2.8). |
+| S3 config, CLI, and devtools | Done (T3.1 to T3.5). |
+| S4 demo, benchmark, and hardening | T4.3, T4.4, and T4.5 are done. T4.1 uses the fallback plan from [ADR-009](decisions.md#adr-009-the-demo-is-a-saas-app-not-a-commerce-app): the demo is `bench/app`, not a fork of `nextjs/saas-starter`. T4.2 has the harness and a smoke test, and no results: nobody has run it with a model yet. |
+| S5 launch | T5.0 is done. T5.1 to T5.3 are open. They need the maintainer's approval. |
+| S6 phase 2 | Not started. |
+
 ## S0 · Verification spikes (2 days)
 
 Goal: resolve the **Unverified** items that could invalidate the architecture **before** building. Each spike adds a short note under [Spike results](#spike-results) with the result, evidence, and decision.
@@ -106,6 +120,139 @@ Results of the [S0 spikes](#s0--verification-spikes-2-days). Add one subsection 
 ```
 
 If a spike refutes a hypothesis, update the affected ADR and the matching **Unverified** entry in `research.md` in the same change.
+
+### SP1 · Server Function as a prop, and `agent()` metadata in the RSC
+
+- Date: 2026-11-26
+- Versions: next@16.4.6, react@19.3.1, Chromium 159.0.8154.6 (Playwright), node@26.7.0
+- Result: Verified
+
+#### Evidence
+
+- A throwaway app wrapped actions with an `agent()` that attaches its options to the returned async function under a symbol. A Server Component imported the `'use server'` module, read the symbol, converted the Zod schema with `~standard.jsonSchema.input`, and passed the function to a Client Component.
+- The Client Component registered a WebMCP tool whose `execute` called the function. The action ran, `revalidatePath('/')` updated the list without a reload, and an invalid input returned `invalid_input` without running the handler.
+- The same flow is now covered by `e2e/specs/basic.spec.ts` on every commit, with the polyfill and with native WebMCP.
+- Next.js checks only that each export of a `'use server'` file is a function (`ensureServerEntryExports` in `next/dist/build/webpack/loaders/next-flight-loader/action-validate.js`).
+
+#### Decision
+
+The metadata lives on the function ([ADR-005](decisions.md#adr-005-rsc-registry-and-route-scoping-by-composition) is accepted). Plan B, the generated `meta/*.ts` files, is not needed.
+
+### SP2 · `redirect()` inside an action that a tool calls
+
+- Date: 2026-11-26
+- Versions: next@16.4.6, react@19.3.1, Chromium 159.0.8154.6, node@26.7.0
+- Result: Verified
+
+#### Evidence
+
+| Question | Observed behavior |
+|---|---|
+| The action's Promise | Rejects on the client after about 46 ms with `Error: NEXT_REDIRECT` and `digest: 'NEXT_REDIRECT;push;/done;307;'`. |
+| The navigation | Happens. The URL changes to the redirect target. |
+| A `Registrar` in the root layout | Stays mounted. The tool result is delivered. |
+| A `Registrar` in the segment that unmounts | The tool result is still delivered, with the polyfill and with native WebMCP (`e2e/specs/redirect.spec.ts`). |
+
+#### Decision
+
+The client catches the rejection, reads the target from the digest, and returns `{ ok: true, data: { navigatedTo } }` (`src/next/redirect.ts`). No router interception is needed. `agent()` rethrows every error that carries a `digest`, so `redirect()` and `notFound()` keep working inside handlers. [architecture.md](architecture.md#redirect-and-navigation) is updated.
+
+### SP3 · `resolveAlias` for an import inside `node_modules/actionmcp`
+
+- Date: 2026-11-26
+- Versions: next@16.4.6 and next@16.2.12, node@26.7.0, npm and pnpm
+- Result: Verified
+
+#### Evidence
+
+- `turbopack.resolveAlias['actionmcp/registry'] = './.agent-tools/registry.ts'` and the webpack `resolve.alias` equivalent both resolve when the importing file is inside `node_modules`.
+- `tests/package/tarball.test.ts` packs the package, installs the tarball with npm in a project outside this repository, builds it, and checks the served HTML for the tool definitions.
+- `tests/integration/fixtures.test.ts` builds every fixture with Turbopack and with webpack inside the pnpm workspace, where the package is a symlink.
+
+#### Decision
+
+`withAgentTools()` sets both aliases. The `registry` prop of `<AgentTools />` remains as the documented escape hatch.
+
+### SP4 · The watcher across `next dev` config restarts
+
+- Date: 2026-11-26
+- Versions: next@16.4.6, node@24.14.1
+- Result: Verified
+
+#### Evidence
+
+- Ten consecutive edits of `next.config.ts` produced ten restarts. Each restart replaced the `next-server` child process, so the old watcher died with it. After the tenth edit, one process and one watcher were alive, and one file change produced one event.
+- Next.js evaluates the config function twice in one process, in `next dev` and in `next build`. A guard on `globalThis` is required.
+- The incremental time is covered by `src/generator/watch.test.ts`: a change in a project with 200 tool files regenerates in under 300 ms.
+
+#### Decision
+
+`withAgentTools()` keeps one preparation per phase and directory in a `globalThis` map, and starts the watcher with `persistent: false`.
+
+### SP5 · Native WebMCP for end-to-end tests
+
+- Date: 2026-11-26
+- Versions: Chromium 159.0.8154.6 (Playwright 1.65.1), Chrome 158 stable, agent-browser 0.45.0 and 0.44.0
+- Result: Verified
+
+#### Evidence
+
+| Launch flag | `document.modelContext` |
+|---|---|
+| none | missing |
+| `--enable-features=WebMCPTesting` | missing in Chromium 159 |
+| `--enable-features=WebMCP` | `registerTool`, `getTools`, `executeTool` |
+| `--enable-experimental-web-platform-features` | the same, plus `resumeTool` and `waitForToolsUntil` (Chromium 159) |
+
+- agent-browser enables WebMCP by default. Against `fixtures/scoped`, `agent-browser webmcp list --json` returned `alpha.read`, `alpha.write`, and `ping` with their annotations, and `agent-browser webmcp invoke alpha.read '{}' --json` returned `{"data":{"title":"Alpha"},"ok":true}`.
+- `bench/smoke.ts` runs five scripted tasks through agent-browser and verifies the database.
+
+#### Decision
+
+The native end-to-end job is the Playwright project `native`, which launches Chromium with `--enable-features=WebMCP` and runs the same specs as the polyfill project. agent-browser is used for the benchmark. [testing.md](testing.md) is updated.
+
+### SP6 · ChatGPT Desktop
+
+- Date: 2026-11-26
+- Result: Not run
+
+#### Evidence
+
+None. The spike needs a person with ChatGPT Desktop. The checklist is in [`e2e/manual/chatgpt.md`](../e2e/manual/chatgpt.md).
+
+#### Decision
+
+No change. The questions stay **Unverified**: late registration, ChatGPT's own confirmation for `consequentialHint`, and how it treats the page's dialog.
+
+### SP7 · Origin trial `<meta>` rendered from an RSC
+
+- Date: 2026-11-26
+- Versions: next@16.4.6, react@19.3.1
+- Result: Partial
+
+#### Evidence
+
+- A `<meta http-equiv="origin-trial">` that `<AgentTools />` renders inside `<body>` appears inside `<head>` in the server HTML. `e2e/specs/basic.spec.ts` and `tests/package/tarball.test.ts` check this.
+- Not checked: whether Chrome activates the WebMCP origin trial from that tag. This needs a real token and a deployment on the registered origin.
+
+#### Decision
+
+`originTrialToken` ships as designed. The activation stays **Unverified** in [research.md](research.md).
+
+### SP8 · What a consumer receives when `execute` rejects
+
+- Date: 2026-11-26
+- Versions: Chromium 159.0.8154.6 with `--enable-features=WebMCP`, `@w3c/webmcp-polyfill@0.2.0`
+- Result: Refuted. This spike was added during development.
+
+#### Evidence
+
+- A tool whose `execute` throws `new DOMException('custom detail', 'NotAllowedError')` makes `executeTool()` reject with `OperationError: Tool execution failed.` in native Chromium and in the polyfill. The name and the message of the thrown error do not reach the consumer.
+- A tool whose `execute` returns an object reaches the consumer as its JSON serialization.
+
+#### Decision
+
+Failures are results, not rejections ([ADR-015](decisions.md#adr-015-tool-failures-are-results-not-rejections)). The hypothesis in the first version of `architecture.md`, that the message of an `OperationError` reaches the agent, was wrong.
 
 ## Risks
 
