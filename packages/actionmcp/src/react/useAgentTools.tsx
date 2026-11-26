@@ -105,6 +105,8 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
       call={current.call}
       title={current.tool.title}
       description={current.tool.description}
+      inputSchema={current.tool.inputSchema}
+      labels={hooks.confirmLabels}
       onConfirm={() => current.settle(true)}
       onCancel={() => current.settle(false)}
     />

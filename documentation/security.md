@@ -10,7 +10,7 @@ The guiding principle: exposing a Server Function as a tool must not add attack 
 |---|---|
 | Opt-in only | A function is a tool only if it is wrapped in `agent()`, listed with `tool()` in `defineAgentTools()`, or tagged with `@agent`. There is no mode that exposes every action. |
 | Consequential by default | A tool is marked with `consequentialHint` unless you set `readOnly: true`. |
-| Human confirmation | Before a consequential tool runs, the page shows a dialog with the tool name, the description, and the input. The action runs only after a click on "Allow". No tool can answer the dialog. |
+| Human confirmation | Before a consequential tool runs, the page shows a dialog with the tool name, the description, and each field of the input. The action runs only after a click on "Allow". No tool can answer the dialog. |
 | Native RPC only | A tool call is the same POST that your UI sends: the encrypted action ID, the `Origin` check, and the user's cookies. actionmcp adds no endpoint and holds no credentials. |
 | Server-side input validation | `agent()` validates the input with your schema before the handler runs. |
 | Literal metadata | Descriptions and names must be string literals in your source code. The build stops otherwise. |
@@ -49,6 +49,8 @@ A heuristic can miss a problem and can flag correct code. The checklist is the r
 ## The confirmation dialog
 
 - It is a native `<dialog>` opened with `showModal()`. The focus starts on "Cancel", so Enter does not approve.
+- It lists every field of the input with its value, rendered as text. A field label comes from the `title` in your input schema, never from the call.
+- `confirmLabels` on `AgentToolsProvider` translates the text of the dialog.
 - A cancel, Escape, or a layout that unmounts returns `{ ok: false, error: { code: 'declined' } }` to the agent. The action does not run.
 - Calls queue behind one dialog. Each call needs its own click.
 - You can replace the dialog with `confirmComponent` on `AgentToolsProvider`, and add your own gate with `onBeforeExecute`.

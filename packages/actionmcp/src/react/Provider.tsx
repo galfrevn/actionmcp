@@ -12,10 +12,11 @@ export function AgentToolsProvider({
   onBeforeExecute,
   onAfterExecute,
   confirmComponent,
+  confirmLabels,
 }: AgentToolsProviderProps): ReactNode {
   const hooks = useMemo(
-    () => ({ onBeforeExecute, onAfterExecute, confirmComponent }),
-    [onBeforeExecute, onAfterExecute, confirmComponent],
+    () => ({ onBeforeExecute, onAfterExecute, confirmComponent, confirmLabels }),
+    [onBeforeExecute, onAfterExecute, confirmComponent, confirmLabels],
   )
   return <AgentToolsContext value={hooks}>{children}</AgentToolsContext>
 }
