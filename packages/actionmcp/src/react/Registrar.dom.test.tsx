@@ -318,9 +318,67 @@ describe('ConfirmDialog', () => {
     )
     const names = [...document.querySelectorAll('dialog dt')].map((element) => element.textContent)
     const values = [...document.querySelectorAll('dialog dd')].map((element) => element.textContent)
-    expect(names).toEqual(['Email address', 'role', 'seats', 'tags'])
+    expect(names).toEqual(['Email address', 'role', 'seats (not in the schema)', 'tags (not in the schema)'])
     expect(values).toEqual(['ana@acme.com', 'admin', '3', JSON.stringify(['a', 'b'], null, 2)])
     expect(document.querySelector('[data-actionmcp-confirm-input]')?.getAttribute('aria-label')).toBe('Action input')
+  })
+
+  it('lists the fields in schema order and the undeclared fields after them, whatever order the call uses', async () => {
+    const call = {
+      name: 'payments.send',
+      input: { 'Recipient (verified)': 'alice', note: 'Thanks', amount: 900, recipient: 'mallory' },
+      annotations: createTool().annotations,
+      source: 'agent' as const,
+    }
+    const inputSchema = {
+      type: 'object',
+      properties: {
+        recipient: { type: 'string', title: 'Recipient' },
+        amount: { type: 'number', title: 'Amount' },
+        note: { type: 'string' },
+      },
+    }
+    await render(
+      <ConfirmDialog call={call} description="Send a payment." inputSchema={inputSchema} onConfirm={() => {}} onCancel={() => {}} />,
+    )
+    const names = [...document.querySelectorAll('dialog dt')].map((element) => element.textContent)
+    const values = [...document.querySelectorAll('dialog dd')].map((element) => element.textContent)
+    expect(names).toEqual(['Recipient', 'Amount', 'note', 'Recipient (verified) (not in the schema)'])
+    expect(values).toEqual(['mallory', '900', 'Thanks', 'alice'])
+  })
+
+  it('scrolls a long value inside its own row so that it cannot hide the other fields', async () => {
+    const call = {
+      name: 'notes.add',
+      input: { text: 'x'.repeat(500), lines: 'a\nb\nc\nd\ne', title: 'Short' },
+      annotations: createTool().annotations,
+      source: 'agent' as const,
+    }
+    await render(<ConfirmDialog call={call} description="Add a note." onConfirm={() => {}} onCancel={() => {}} />)
+    const [text, lines, title] = [...document.querySelectorAll<HTMLElement>('dialog dd')]
+    expect(text?.tabIndex).toBe(0)
+    expect(text?.style.maxHeight).toBe('6rem')
+    expect(text?.style.overflow).toBe('auto')
+    expect(lines?.tabIndex).toBe(0)
+    expect(title?.hasAttribute('tabindex')).toBe(false)
+    expect(title?.style.maxHeight).toBe('')
+    expect(document.querySelector<HTMLElement>('[data-actionmcp-confirm-input]')?.style.maxHeight).toBe('')
+  })
+
+  it('translates the label of an undeclared field', async () => {
+    const call = { name: 'a', input: { extra: 1 }, annotations: createTool().annotations, source: 'agent' as const }
+    const inputSchema = { type: 'object', properties: {} }
+    await render(
+      <ConfirmDialog
+        call={call}
+        description="Run it."
+        inputSchema={inputSchema}
+        labels={{ extra: 'fuera del schema' }}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+    expect(document.querySelector('dialog dt')?.textContent).toBe('extra (fuera del schema)')
   })
 
   it('renders an input value as text and never as markup', async () => {

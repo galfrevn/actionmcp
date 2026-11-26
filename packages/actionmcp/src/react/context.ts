@@ -7,6 +7,7 @@ export interface ConfirmLabels {
   title: string
   intro: string
   input: string
+  extra: string
   allow: string
   cancel: string
 }

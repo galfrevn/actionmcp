@@ -50,7 +50,9 @@ A heuristic can miss a problem and can flag correct code. The checklist is the r
 ## The confirmation dialog
 
 - It is a native `<dialog>` opened with `showModal()`. The focus starts on "Cancel", so Enter does not approve.
-- It lists every field of the input with its value, rendered as text. A field label comes from the `title` in your input schema, never from the call.
+- It lists every field of the input with its value, rendered as text. The fields that the input schema declares come first, in the order of the schema, and their labels come from the `title` in your input schema. The agent chooses neither that order nor those labels.
+- A field that the input schema does not declare comes after the declared ones. Its label is the name from the call followed by "not in the schema", so it cannot pass for a declared field.
+- A long value scrolls inside its own row, so it cannot push the other fields out of view.
 - `confirmLabels` on `AgentToolsProvider` translates the text of the dialog.
 - A cancel, Escape, or a layout that unmounts returns `{ ok: false, error: { code: 'declined' } }` to the agent. The action does not run.
 - Calls queue behind one dialog. Each call needs its own click.

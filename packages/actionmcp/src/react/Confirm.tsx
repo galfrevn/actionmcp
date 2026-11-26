@@ -11,6 +11,7 @@ export const DEFAULT_CONFIRM_LABELS: ConfirmLabels = {
   title: `Allow “${TOOL_PLACEHOLDER}”?`,
   intro: 'An agent wants to run this action.',
   input: 'Action input',
+  extra: 'not in the schema',
   allow: 'Allow',
   cancel: 'Cancel',
 }
@@ -27,10 +28,8 @@ const dialogStyle: CSSProperties = {
 }
 
 const inputStyle: CSSProperties = {
-  maxHeight: '12rem',
   margin: '0.75rem 0 0',
   padding: '0.5rem',
-  overflow: 'auto',
   border: '1px solid GrayText',
   borderRadius: '0.375rem',
   font: '0.75rem/1.4 ui-monospace, monospace',
@@ -44,28 +43,57 @@ const fieldNameStyle: CSSProperties = { fontWeight: 600 }
 
 const fieldValueStyle: CSSProperties = { margin: 0 }
 
+const longValueStyle: CSSProperties = { margin: 0, maxHeight: '6rem', overflow: 'auto' }
+
 const actionsStyle: CSSProperties = { display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }
 
 const buttonStyle: CSSProperties = { padding: '0.375rem 0.875rem', font: 'inherit', cursor: 'pointer' }
+
+const LONG_VALUE_LENGTH = 160
+const LONG_VALUE_LINES = 4
 
 function formatValue(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
 }
 
-function fieldLabel(name: string, inputSchema: JsonSchema | undefined): string {
-  const properties = inputSchema?.properties
-  const property = isRecord(properties) ? properties[name] : undefined
+function isLong(text: string): boolean {
+  return text.length > LONG_VALUE_LENGTH || text.split('\n').length > LONG_VALUE_LINES
+}
+
+function Value({ value, as: Element }: { value: unknown; as: 'dd' | 'div' }): ReactNode {
+  const text = formatValue(value)
+  return isLong(text) ? (
+    <Element tabIndex={0} style={longValueStyle}>
+      {text}
+    </Element>
+  ) : (
+    <Element style={fieldValueStyle}>{text}</Element>
+  )
+}
+
+function orderFields(input: Record<string, unknown>, properties: Record<string, unknown> | undefined): string[] {
+  const names = Object.keys(input)
+  if (!properties) return names
+  const declared = Object.keys(properties).filter((name) => Object.hasOwn(input, name))
+  return [...declared, ...names.filter((name) => !Object.hasOwn(properties, name))]
+}
+
+function fieldLabel(name: string, properties: Record<string, unknown> | undefined, extra: string): string {
+  if (!properties) return name
+  if (!Object.hasOwn(properties, name)) return `${name} (${extra})`
+  const property = properties[name]
   return isRecord(property) && typeof property.title === 'string' && property.title.trim() ? property.title : name
 }
 
-function InputSummary({ input, inputSchema }: { input: unknown; inputSchema: JsonSchema | undefined }): ReactNode {
-  if (!isRecord(input)) return formatValue(input)
+function InputSummary({ input, inputSchema, extra }: { input: unknown; inputSchema: JsonSchema | undefined; extra: string }): ReactNode {
+  if (!isRecord(input)) return <Value value={input} as="div" />
+  const properties = isRecord(inputSchema?.properties) ? inputSchema.properties : undefined
   return (
     <dl style={fieldsStyle}>
-      {Object.entries(input).map(([name, value]) => (
+      {orderFields(input, properties).map((name) => (
         <Fragment key={name}>
-          <dt style={fieldNameStyle}>{fieldLabel(name, inputSchema)}</dt>
-          <dd style={fieldValueStyle}>{formatValue(value)}</dd>
+          <dt style={fieldNameStyle}>{fieldLabel(name, properties, extra)}</dt>
+          <Value value={input[name]} as="dd" />
         </Fragment>
       ))}
     </dl>
@@ -108,8 +136,8 @@ export function ConfirmDialog({ call, title, description, inputSchema, labels, o
         {text.intro} {description}
       </p>
       {hasInput(call.input) ? (
-        <div tabIndex={0} role="group" aria-label={text.input} data-actionmcp-confirm-input="" style={inputStyle}>
-          <InputSummary input={call.input} inputSchema={inputSchema} />
+        <div role="group" aria-label={text.input} data-actionmcp-confirm-input="" style={inputStyle}>
+          <InputSummary input={call.input} inputSchema={inputSchema} extra={text.extra} />
         </div>
       ) : null}
       <div style={actionsStyle}>

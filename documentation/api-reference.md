@@ -153,7 +153,7 @@ A floating panel that renders only when `NODE_ENV` is `development`. It shows wh
 
 The default confirmation component, exported so that a custom one can wrap it.
 
-The dialog shows the title, the tool description, and one row for each field of the input. The label of a row is the `title` of that property in the input schema, or the field name. With Zod, set it with `z.string().meta({ title: 'Email address' })`.
+The dialog shows the title, the tool description, and one row for each field of the input. The rows of the fields that the input schema declares come first, in the order of the schema. The label of such a row is the `title` of that property in the input schema, or the field name. With Zod, set it with `z.string().meta({ title: 'Email address' })`. A field that the input schema does not declare comes after them, labeled with its name and the `extra` label. A value longer than 160 characters or 4 lines scrolls inside its own row.
 
 `ConfirmLabels` holds the text of the dialog:
 
@@ -162,6 +162,7 @@ The dialog shows the title, the tool description, and one row for each field of 
 | `title` | `Allow “{tool}”?`. `{tool}` is replaced with the tool title, or with the tool name. |
 | `intro` | `An agent wants to run this action.` |
 | `input` | `Action input`, the accessible name of the input list. |
+| `extra` | `not in the schema`, shown after the name of a field that the input schema does not declare. |
 | `allow` | `Allow` |
 | `cancel` | `Cancel` |
 
