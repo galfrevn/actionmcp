@@ -24,6 +24,15 @@ export interface AgentToolsRegistration {
 const noConfirmation = () => undefined
 
 const claimedNames = new Map<string, number>()
+let warnedInsecureContext = false
+
+function warnInsecureContext(): void {
+  if (warnedInsecureContext || globalThis.isSecureContext !== false) return
+  warnedInsecureContext = true
+  console.warn(
+    `actionmcp: WebMCP needs a secure context, and ${location.origin} is not one, so no tool is registered. Open the app over HTTPS or on http://localhost.`,
+  )
+}
 
 function claimNames(names: readonly string[], change: 1 | -1): void {
   for (const name of names) claimedNames.set(name, (claimedNames.get(name) ?? 0) + change)
@@ -93,7 +102,10 @@ export function useAgentTools(tools: readonly SerializableToolDef[], registratio
       }),
     )
     const names = definitions.map((definition) => definition.name)
-    if (process.env.NODE_ENV !== 'production') claimNames(names, 1)
+    if (process.env.NODE_ENV !== 'production') {
+      claimNames(names, 1)
+      warnInsecureContext()
+    }
     void resolveModelContext(stable.polyfill, signal).then(async (context) => {
       if (!context || signal.aborted) return
       const results = await registerTools(context, definitions, {

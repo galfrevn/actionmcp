@@ -4,6 +4,10 @@
 
 Because exposure is a security decision, and a default cannot make it for you. A named, described tool that an agent can call with the user's session has more reach than an unlisted endpoint, especially when the agent reads untrusted content. actionmcp exposes a function only when you wrap it in `agent()`, list it with `tool()`, or tag it with `@agent`. There is no flag that exposes everything.
 
+## Why are there no tools when I open the app from my phone?
+
+WebMCP exists only in a secure context. A page on `http://192.168.1.20:3000` or `http://myapp.local` is not one, so the browser has no `document.modelContext` and the polyfill does not install. In development, `<AgentTools />` logs a warning on such a page. Open the app over HTTPS, for example with `next dev --experimental-https`, or on `http://localhost`.
+
 ## Does it work in Safari or Firefox?
 
 Not with a native agent, as long as those browsers do not implement WebMCP. The [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) of the WebMCP draft lists the browsers and agents that support it.

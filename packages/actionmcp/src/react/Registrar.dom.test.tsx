@@ -127,6 +127,17 @@ describe('Registrar', () => {
     warned.mockRestore()
   })
 
+  it('warns once in development when the page is not a secure context', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    Object.defineProperty(globalThis, 'isSecureContext', { value: false, configurable: true })
+    await render(<Registrar tools={[createTool()]} />)
+    await render(<Registrar tools={[createTool({ name: 'other' })]} />)
+    Object.defineProperty(globalThis, 'isSecureContext', { value: true, configurable: true })
+    expect(warned).toHaveBeenCalledOnce()
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('WebMCP needs a secure context'))
+    warned.mockRestore()
+  })
+
   it('keeps the registration when the same definitions render again', async () => {
     const onChange = vi.fn()
     await render(<Registrar tools={[createTool()]} />)
