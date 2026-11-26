@@ -25,3 +25,8 @@ playwright-report/
 
 # Temporary projects created by the integration tests
 tests/integration/.tmp/
+
+# Written by next dev in the fixture and example apps
+fixtures/*/AGENTS.md
+examples/*/AGENTS.md
+bench/app/AGENTS.md
