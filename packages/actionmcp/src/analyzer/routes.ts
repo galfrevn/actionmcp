@@ -68,7 +68,9 @@ function cachedPageMetadata(pageFile: string, cache: PageMetadataCache): PageMet
 }
 
 function isExcluded(name: string, isRoot: boolean): boolean {
-  return name.startsWith('_') || name.startsWith('@') || INTERCEPTING_ROUTE.test(name) || name === 'node_modules' || (isRoot && name === 'api')
+  return (
+    name.startsWith('_') || name.startsWith('@') || INTERCEPTING_ROUTE.test(name) || name === 'node_modules' || (isRoot && name === 'api')
+  )
 }
 
 function toRoute(segments: readonly string[], metadata: PageMetadata): RouteEntry {

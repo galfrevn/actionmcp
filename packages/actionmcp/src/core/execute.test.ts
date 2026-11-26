@@ -151,9 +151,7 @@ describe('executeTool', () => {
 
   it('returns a generic failure when the action throws a non-error', async () => {
     const tool = createTool({ confirm: 'never', action: async () => Promise.reject('nope') })
-    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(
-      fail('failed', GENERIC_FAILURE_MESSAGE),
-    )
+    await expect(executeTool(tool, {}, neverAborted(), createRuntime())).resolves.toEqual(fail('failed', GENERIC_FAILURE_MESSAGE))
   })
 
   it('lets the runtime recover a thrown error', async () => {

@@ -4,14 +4,7 @@ import { createDiagnostic, type Diagnostic, type DiagnosticCode } from './diagno
 import { formDataAdapter, parseAgentTag, type AgentTag } from './jsdoc'
 import type { AnalyzedTool } from './model'
 import { readToolOptions } from './options'
-import {
-  collectCalleeNames,
-  collectObjectKeys,
-  collectReferencedNames,
-  hasUseServerDirective,
-  walk,
-  type ParsedModule,
-} from './source'
+import { collectCalleeNames, collectObjectKeys, collectReferencedNames, hasUseServerDirective, walk, type ParsedModule } from './source'
 
 export interface ScanOptions {
   jsdoc: boolean
@@ -297,8 +290,7 @@ function functionName(node: AnyFunction): string | undefined {
 
 function asFunction(node: Node | null | undefined): AnyFunction | undefined {
   if (!node) return undefined
-  const isFunction =
-    node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression'
+  const isFunction = node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression'
   return isFunction ? (node as AnyFunction) : undefined
 }
 
@@ -366,8 +358,7 @@ function usesNavigate(context: ModuleContext): boolean {
     for (const attribute of node.attributes) {
       if (attribute.type !== 'JSXAttribute' || attribute.name.type !== 'JSXIdentifier' || attribute.name.name !== 'navigate') continue
       const value = attribute.value
-      const disabled =
-        value?.type === 'JSXExpressionContainer' && value.expression.type === 'Literal' && value.expression.value === false
+      const disabled = value?.type === 'JSXExpressionContainer' && value.expression.type === 'Literal' && value.expression.value === false
       if (!disabled) found = true
     }
   })

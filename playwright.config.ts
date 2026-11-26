@@ -12,10 +12,7 @@ export default defineConfig({
   workers: isCI ? 2 : 4,
   reporter: isCI ? [['github'], ['list']] : [['list']],
   use: { browserName: 'chromium', trace: 'retain-on-failure' },
-  projects: [
-    { name: 'polyfill' },
-    { name: 'native', use: { launchOptions: { args: ['--enable-features=WebMCP'] } } },
-  ],
+  projects: [{ name: 'polyfill' }, { name: 'native', use: { launchOptions: { args: ['--enable-features=WebMCP'] } } }],
   webServer: [...fixtureServers, ...exampleServers].map((server) => ({
     command: `pnpm exec next ${server.mode} -p ${server.port}`,
     cwd: server.directory,

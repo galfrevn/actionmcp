@@ -77,7 +77,10 @@ describe('watchProject', () => {
   })
 
   it('ignores its own output and dependency folders', async () => {
-    const { write, results } = await start({ 'src/actions.ts': tool('ping'), 'src/node_modules/pkg/index.ts': '' }, { outDir: 'src/generated' })
+    const { write, results } = await start(
+      { 'src/actions.ts': tool('ping'), 'src/node_modules/pkg/index.ts': '' },
+      { outDir: 'src/generated' },
+    )
     write('src/generated/registry.ts', 'export default {}\n')
     write('src/node_modules/pkg/index.ts', tool('hidden'))
     await settle()
@@ -85,7 +88,11 @@ describe('watchProject', () => {
   })
 
   it('regenerates when the registry file changes and ignores its siblings', async () => {
-    const { write, results } = await start({ 'agent-tools.ts': REGISTRY('Check that the session is still valid.'), 'lib/ping.ts': '', 'notes.txt': '' })
+    const { write, results } = await start({
+      'agent-tools.ts': REGISTRY('Check that the session is still valid.'),
+      'lib/ping.ts': '',
+      'notes.txt': '',
+    })
     write('notes.txt', 'unrelated')
     await settle()
     expect(results).toEqual([])

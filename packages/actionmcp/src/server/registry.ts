@@ -1,13 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { isNonEmptyString } from '../core/guards'
-import type {
-  ConfirmPolicy,
-  JsonSchema,
-  RouteEntry,
-  ServerFunction,
-  ToolAdapter,
-  ToolAnnotations,
-} from '../core/types'
+import type { ConfirmPolicy, JsonSchema, RouteEntry, ServerFunction, ToolAdapter, ToolAnnotations } from '../core/types'
 import { readAgentMeta, type AgentToolOptions } from './agent'
 
 const REGISTRY: unique symbol = Symbol.for('actionmcp.registry') as never
@@ -61,9 +54,7 @@ export interface RegistrySources {
   routes?: RouteEntry[]
 }
 
-export function fromFormDataAction(
-  action: (previousState: never, formData: FormData) => Promise<unknown>,
-): AdaptedAction {
+export function fromFormDataAction(action: (previousState: never, formData: FormData) => Promise<unknown>): AdaptedAction {
   return { action, adapter: 'formdata' }
 }
 

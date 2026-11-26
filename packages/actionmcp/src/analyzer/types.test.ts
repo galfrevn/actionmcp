@@ -59,8 +59,16 @@ export const search = async (filters: Filters) => filters
           role: { type: 'string', enum: ['admin', 'member'] },
           shape: {
             anyOf: [
-              { type: 'object', properties: { kind: { type: 'string', const: 'circle' }, radius: { type: 'number' } }, required: ['kind', 'radius'] },
-              { type: 'object', properties: { kind: { type: 'string', const: 'square' }, side: { type: 'number' } }, required: ['kind', 'side'] },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'circle' }, radius: { type: 'number' } },
+                required: ['kind', 'radius'],
+              },
+              {
+                type: 'object',
+                properties: { kind: { type: 'string', const: 'square' }, side: { type: 'number' } },
+                required: ['kind', 'side'],
+              },
             ],
           },
           tags: { type: 'array', items: { type: 'string' } },
@@ -72,8 +80,13 @@ export const search = async (filters: Filters) => filters
 
   it('follows types imported from another module', async () => {
     const code = `import type { Invite } from '../lib/types'\nexport async function invite(input: Invite) { return input }\n`
-    const inference = await infer(code, 'input:', { 'lib/types.ts': `export interface Invite { email: string; role: 'owner' | 'member' }\n` })
-    expect(inference).toMatchObject({ ok: true, schema: { properties: { email: { type: 'string' }, role: { enum: ['owner', 'member'] } } } })
+    const inference = await infer(code, 'input:', {
+      'lib/types.ts': `export interface Invite { email: string; role: 'owner' | 'member' }\n`,
+    })
+    expect(inference).toMatchObject({
+      ok: true,
+      schema: { properties: { email: { type: 'string' }, role: { enum: ['owner', 'member'] } } },
+    })
   })
 
   it('keeps $defs for a recursive type', async () => {

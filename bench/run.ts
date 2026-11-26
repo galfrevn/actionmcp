@@ -64,7 +64,9 @@ try {
         await browser(options, ['close'])
         const success = !result.error && task.verify(readDatabase(), result.answer, seed)
         appendFileSync(outFile, `${JSON.stringify({ type: 'run', task: task.id, mode, run, success, prompt: task.prompt, ...result })}\n`)
-        console.log(`${task.id} ${mode} ${run}/${runs} ${success ? 'ok' : 'failed'} ${result.durationMs} ms ${result.inputTokens + result.outputTokens} tokens`)
+        console.log(
+          `${task.id} ${mode} ${run}/${runs} ${success ? 'ok' : 'failed'} ${result.durationMs} ms ${result.inputTokens + result.outputTokens} tokens`,
+        )
       }
     }
   }

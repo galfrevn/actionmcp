@@ -52,7 +52,12 @@ describe('resolveConfig', () => {
   it('finds agent-tools.ts by default and honors explicit values', () => {
     const { cwd } = setup({ 'agent-tools.ts': '', 'tools/registry.ts': '' })
     expect(resolveConfig({}, cwd).registry).toBe(join(cwd, 'agent-tools.ts'))
-    expect(resolveConfig({ registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] }, cwd)).toEqual({
+    expect(
+      resolveConfig(
+        { registry: './tools/registry.ts', outDir: 'generated', scan: ['features/**'], jsdoc: true, auth: ['ensureUser'] },
+        cwd,
+      ),
+    ).toEqual({
       cwd,
       registry: join(cwd, 'tools/registry.ts'),
       scan: ['features/**'],
@@ -193,7 +198,8 @@ export default defineAgentTools({ 'todos.list': list })
 
   it('lists the navigate tool when a layout enables it', async () => {
     const { cwd } = setup({
-      'app/layout.tsx': "import { AgentTools } from 'actionmcp'\nexport default function Layout({ children }) { return <html><body>{children}<AgentTools navigate /></body></html> }\n",
+      'app/layout.tsx':
+        "import { AgentTools } from 'actionmcp'\nexport default function Layout({ children }) { return <html><body>{children}<AgentTools navigate /></body></html> }\n",
       'app/page.tsx': PAGE,
       'app/todos/page.tsx': PAGE,
     })
@@ -235,7 +241,9 @@ export default defineAgentTools({ 'todos.list': list })
 
 describe('formatDiagnostic', () => {
   it('prints the level, code, location, message, and fix', async () => {
-    const { cwd } = setup({ 'app/actions.ts': `'use server'\nimport { agent } from 'actionmcp/server'\nconst hidden = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })\n` })
+    const { cwd } = setup({
+      'app/actions.ts': `'use server'\nimport { agent } from 'actionmcp/server'\nconst hidden = agent({ description: 'Do something useful for the signed-in user.' }, async () => { await requireUser() })\n`,
+    })
     const [diagnostic] = (await analyze(resolveConfig({}, cwd))).diagnostics
     if (!diagnostic) throw new Error('Expected a diagnostic')
     expect(formatDiagnostic(diagnostic)).toBe(

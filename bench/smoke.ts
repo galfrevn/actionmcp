@@ -34,7 +34,10 @@ const SCRIPTS: Record<string, () => Promise<string>> = {
   'list-owners': async () => {
     const { output } = await invoke('team.listMembers', {})
     const members = output.data as Array<{ email: string; role: string }>
-    return members.filter((member) => member.role === 'owner').map((member) => member.email).join(', ')
+    return members
+      .filter((member) => member.role === 'owner')
+      .map((member) => member.email)
+      .join(', ')
   },
   composite: async () => {
     const { output } = await invoke('team.listMembers', {})
@@ -50,10 +53,14 @@ const server = await startApp()
 try {
   await browser(options, ['open', `${APP_URL}/team`])
   const { tools } = await browserJson<ToolList>(options, ['webmcp', 'list'])
-  assert.deepEqual(
-    tools.map((tool) => tool.name).toSorted(),
-    ['account.delete', 'account.update', 'navigate', 'team.inviteMember', 'team.listMembers', 'team.removeMember'],
-  )
+  assert.deepEqual(tools.map((tool) => tool.name).toSorted(), [
+    'account.delete',
+    'account.update',
+    'navigate',
+    'team.inviteMember',
+    'team.listMembers',
+    'team.removeMember',
+  ])
   for (const task of TASKS) {
     const seed = resetDatabase()
     const script = SCRIPTS[task.id]

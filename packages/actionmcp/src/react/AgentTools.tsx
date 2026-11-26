@@ -40,12 +40,7 @@ export function AgentTools({
       {originTrialToken ? <meta httpEquiv="origin-trial" content={originTrialToken} /> : null}
       <Registrar tools={tools} polyfill={polyfill} exposedTo={exposedTo} />
       {routes.length > 0 ? (
-        <NavigateTool
-          routes={routes}
-          name={applyPrefix(NAVIGATE_TOOL_NAME, prefix)}
-          polyfill={polyfill}
-          exposedTo={exposedTo}
-        />
+        <NavigateTool routes={routes} name={applyPrefix(NAVIGATE_TOOL_NAME, prefix)} polyfill={polyfill} exposedTo={exposedTo} />
       ) : null}
     </>
   )

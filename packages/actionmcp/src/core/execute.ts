@@ -1,13 +1,6 @@
 import { publishToolCall, type ConfirmationOutcome } from './events'
 import { toFormData } from './formdata'
-import {
-  BLOCKED_MESSAGE,
-  DECLINED_MESSAGE,
-  GENERIC_FAILURE_MESSAGE,
-  fail,
-  normalizeActionResult,
-  type AgentResult,
-} from './result'
+import { BLOCKED_MESSAGE, DECLINED_MESSAGE, GENERIC_FAILURE_MESSAGE, fail, normalizeActionResult, type AgentResult } from './result'
 import type { SerializableToolDef, ToolCall } from './types'
 
 export interface ToolRuntime {
@@ -71,7 +64,9 @@ async function invoke(tool: SerializableToolDef, input: unknown, runtime: ToolRu
   try {
     return normalizeActionResult(await callAction(tool, input), tool.adapter)
   } catch (error) {
-    return runtime.recoverError?.(error) ?? fail('failed', error instanceof Error && error.message ? error.message : GENERIC_FAILURE_MESSAGE)
+    return (
+      runtime.recoverError?.(error) ?? fail('failed', error instanceof Error && error.message ? error.message : GENERIC_FAILURE_MESSAGE)
+    )
   }
 }
 

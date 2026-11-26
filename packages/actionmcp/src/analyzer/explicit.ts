@@ -30,7 +30,9 @@ export function scanRegistryModule(module: ParsedModule): RegistryScan {
   const definition = findCall(module.program, imports, 'defineAgentTools')
   const [tools] = definition?.arguments ?? []
   if (tools?.type !== 'ObjectExpression') {
-    scan.diagnostics.push(createDiagnostic('AT007', module.locate(definition?.start ?? 0), 'no defineAgentTools({ ... }) call with an object literal'))
+    scan.diagnostics.push(
+      createDiagnostic('AT007', module.locate(definition?.start ?? 0), 'no defineAgentTools({ ... }) call with an object literal'),
+    )
     return scan
   }
   for (const property of tools.properties) {

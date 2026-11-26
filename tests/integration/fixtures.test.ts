@@ -24,7 +24,20 @@ const FIXTURES: FixtureExpectation[] = [
   {
     name: 'navigate',
     tools: ['navigate'],
-    routes: ['/', '/api/health', '/docs/[...path]', '/feed', '/feed/(.)photo', '/feed/photo', '/login', '/posts/[slug]', '/pricing', '/projects', '/projects/[id]', '/todos'],
+    routes: [
+      '/',
+      '/api/health',
+      '/docs/[...path]',
+      '/feed',
+      '/feed/(.)photo',
+      '/feed/photo',
+      '/login',
+      '/posts/[slug]',
+      '/pricing',
+      '/projects',
+      '/projects/[id]',
+      '/todos',
+    ],
     prerendered: { file: 'projects.html', toolNames: ['navigate', 'projects.navigate'] },
   },
   {
@@ -34,7 +47,12 @@ const FIXTURES: FixtureExpectation[] = [
     prerendered: { file: 'start.html', toolNames: ['finishOnboarding', 'leaveStart'] },
   },
   { name: 'hostile', tools: ['deleteAccount', 'listComments', 'restoreAccount'], routes: ['/'] },
-  { name: 'coexist', tools: ['getProfile', 'get_cart'], routes: ['/'], prerendered: { file: 'index.html', toolNames: ['getProfile', 'get_cart'] } },
+  {
+    name: 'coexist',
+    tools: ['getProfile', 'get_cart'],
+    routes: ['/'],
+    prerendered: { file: 'index.html', toolNames: ['getProfile', 'get_cart'] },
+  },
 ]
 
 const BUNDLERS: Bundler[] = ['webpack', 'turbopack']

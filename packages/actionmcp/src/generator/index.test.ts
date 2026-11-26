@@ -147,7 +147,12 @@ describe('generate', () => {
   it('writes the manifest', async () => {
     project = createProject(FILES)
     await generate(resolveConfig({ jsdoc: true }, project.cwd))
-    const manifest = JSON.parse(read('manifest.json')) as { version: number; nextVersion: string; tools: Array<Record<string, unknown>>; routes: unknown[] }
+    const manifest = JSON.parse(read('manifest.json')) as {
+      version: number
+      nextVersion: string
+      tools: Array<Record<string, unknown>>
+      routes: unknown[]
+    }
     expect(manifest.version).toBe(1)
     expect(manifest.nextVersion).toMatch(/^(?:\d+\.\d+\.\d+.*|unknown)$/)
     expect(manifest).not.toHaveProperty('generatedAt')
@@ -164,10 +169,21 @@ describe('generate', () => {
         validated: true,
         diagnostics: [],
       },
-      expect.objectContaining({ name: 'importProjects', kind: 'jsdoc', adapter: 'formdata', schemaSource: 'none', validated: false, diagnostics: ['AT101'] }),
+      expect.objectContaining({
+        name: 'importProjects',
+        kind: 'jsdoc',
+        adapter: 'formdata',
+        schemaSource: 'none',
+        validated: false,
+        diagnostics: ['AT101'],
+      }),
       expect.objectContaining({ name: 'loginUser', kind: 'explicit', adapter: 'safe-action', validated: false }),
       expect.objectContaining({ name: 'renameProject', kind: 'jsdoc', schemaSource: 'typescript' }),
-      expect.objectContaining({ name: 'todos.list', kind: 'agent', annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false } }),
+      expect.objectContaining({
+        name: 'todos.list',
+        kind: 'agent',
+        annotations: { readOnlyHint: true, consequentialHint: false, untrustedContentHint: false },
+      }),
     ])
   })
 

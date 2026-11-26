@@ -62,9 +62,7 @@ describe('buildHref', () => {
   })
 
   it('appends the query string', () => {
-    expect(buildHref(routes, { route: '/todos', query: { filter: 'open items', page: '2' } })).toBe(
-      '/todos?filter=open+items&page=2',
-    )
+    expect(buildHref(routes, { route: '/todos', query: { filter: 'open items', page: '2' } })).toBe('/todos?filter=open+items&page=2')
   })
 
   it('rejects a route outside the allowed list', () => {
@@ -82,10 +80,14 @@ describe('buildHref', () => {
     expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: '../admin' } })).toThrow(
       'The route parameter "path" cannot contain the path segment "..".',
     )
-    expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: 'guides/./../..' } })).toThrow('cannot contain the path segment "."')
+    expect(() => buildHref(routes, { route: '/docs/[...path]', params: { path: 'guides/./../..' } })).toThrow(
+      'cannot contain the path segment "."',
+    )
     expect(() => buildHref(routes, { route: '/projects/[id]', params: { id: '..' } })).toThrow('cannot contain the path segment ".."')
     expect(() => buildHref(routes, { route: '/projects/[id]', params: { id: '.' } })).toThrow('cannot contain the path segment "."')
-    expect(() => buildHref(routes, { route: '/shop/[[...filters]]', params: { filters: '../todos' } })).toThrow('cannot contain the path segment ".."')
+    expect(() => buildHref(routes, { route: '/shop/[[...filters]]', params: { filters: '../todos' } })).toThrow(
+      'cannot contain the path segment ".."',
+    )
   })
 
   it('keeps dots inside a longer segment and encodes an encoded dot segment again', () => {

@@ -38,10 +38,7 @@ export interface AgentToolMarker {
   readonly [AGENT_META]: AgentToolMeta
 }
 
-export type AgentTool<Args extends unknown[] = never[], Data = unknown> = ((
-  ...args: Args
-) => Promise<AgentResult<Data>>) &
-  AgentToolMarker
+export type AgentTool<Args extends unknown[] = never[], Data = unknown> = ((...args: Args) => Promise<AgentResult<Data>>) & AgentToolMarker
 
 type InputOf<Schema extends StandardSchemaV1> = StandardSchemaV1.InferInput<Schema>
 type OutputOf<Schema extends StandardSchemaV1> = StandardSchemaV1.InferOutput<Schema>

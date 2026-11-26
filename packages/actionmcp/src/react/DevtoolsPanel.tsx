@@ -99,9 +99,7 @@ export function DevtoolsPanel(): ReactNode {
       setStatus(getWebMCPStatus())
       refresh()
     })
-    const unsubscribe = subscribeToToolCalls((record) =>
-      setHistory((records) => [record, ...records].slice(0, HISTORY_LIMIT)),
-    )
+    const unsubscribe = subscribeToToolCalls((record) => setHistory((records) => [record, ...records].slice(0, HISTORY_LIMIT)))
     return () => {
       controller.abort()
       unsubscribe()
@@ -158,12 +156,7 @@ export function DevtoolsPanel(): ReactNode {
               <pre style={styles.code}>{format(selected.inputSchema ?? 'No input schema')}</pre>
               <label>
                 <span style={styles.heading}>Input (JSON)</span>
-                <textarea
-                  value={input}
-                  spellCheck={false}
-                  style={styles.input}
-                  onChange={(event) => setInput(event.target.value)}
-                />
+                <textarea value={input} spellCheck={false} style={styles.input} onChange={(event) => setInput(event.target.value)} />
               </label>
               <button type="button" data-actionmcp-devtools="run" onClick={() => void run(selected)}>
                 Run {selected.name}

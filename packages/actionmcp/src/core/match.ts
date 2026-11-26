@@ -3,7 +3,12 @@ const SPECIAL_CHARACTERS = /[.+?^${}()|[\]\\]/g
 function patternToRegExp(pattern: string): RegExp {
   const source = pattern
     .split('**')
-    .map((part) => part.split('*').map((literal) => literal.replace(SPECIAL_CHARACTERS, '\\$&')).join('[^/]*'))
+    .map((part) =>
+      part
+        .split('*')
+        .map((literal) => literal.replace(SPECIAL_CHARACTERS, '\\$&'))
+        .join('[^/]*'),
+    )
     .join('.*')
   return new RegExp(`^${source}$`)
 }
