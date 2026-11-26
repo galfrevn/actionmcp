@@ -1,6 +1,6 @@
 {
   "name": "actionmcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WebMCP tools from your Server Actions. Opt-in, typed, safe by default.",
   "license": "MIT",
   "author": "Valentin Galfre",

@@ -2,6 +2,25 @@
 
 This project follows [Semantic Versioning](https://semver.org). While the version is 0.x, a minor release can contain breaking changes.
 
+## 0.2.0
+
+### Changed
+
+- **Breaking:** `ts-json-schema-generator` is an optional peer dependency, and `typescript` is no longer a dependency. An app that uses the experimental `@agent` tag must install the generator: `npm install --save-dev ts-json-schema-generator`. Without it, the `AT206` error stops `next build` and the `@agent` tools are left out of the registry. An app that does not use `@agent` needs no change.
+- The confirmation dialog lists each field of the input with its value instead of the input as JSON. The label of a field is the `title` of its property in the input schema, or the field name.
+- The `Release` workflow publishes with npm trusted publishing instead of an npm token.
+
+### Added
+
+- `confirmLabels` on `AgentToolsProvider`, and the `labels` and `inputSchema` props of `ConfirmDialog`, to translate the dialog without replacing it.
+- The `AT109` warning for an `agent()` call that the analyzer cannot register, such as a call inside a factory function or wrapped in another call.
+- Without the polyfill, tools are registered on a `document.modelContext` that a browser extension installs up to about five seconds after the page loads.
+
+### Fixed
+
+- The `navigate` tool rejects a parameter that contains the path segment `.` or `..`. Before, a call such as `{ route: '/docs/[...path]', params: { path: '../login' } }` opened a route outside the list of the tool.
+- In watch mode, the generator no longer reads and parses every page again after each change.
+
 ## 0.1.0
 
 ### Added
