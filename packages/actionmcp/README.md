@@ -65,7 +65,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 - An in-page dialog asks a human before a consequential tool runs.
 - Tools run through the native Server Function RPC. actionmcp adds no endpoint.
 
-The threat model is in [security.md](https://github.com/galfrevn/actionmcp/blob/main/documentation/security.md).
+The checklist for each tool and the threat model are in [security.md](https://github.com/galfrevn/actionmcp/blob/main/documentation/security.md).
 
 ## License
 

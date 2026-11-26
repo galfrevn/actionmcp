@@ -2,7 +2,7 @@
 
 This guide adds actionmcp to an existing Next.js App Router app and exposes one Server Function as a WebMCP tool.
 
-actionmcp is not published to npm yet. Until the first release, build it from this repository: the [examples](../examples) show the result of each step.
+The [examples](../examples) show the result of each step.
 
 ## Requirements
 
@@ -133,7 +133,7 @@ import { AgentTools, AgentToolsDevtools } from 'actionmcp'
 <AgentToolsDevtools />
 ```
 
-`polyfill` loads `@w3c/webmcp-polyfill` when the browser has no `document.modelContext`. **Native browser agents do not see tools that the polyfill registers.** The polyfill is for the devtools panel, tests, and an in-app chat. For a native agent, use a browser from the "Where WebMCP runs today" table in the [README](../README.md#where-webmcp-runs-today).
+`polyfill` loads `@w3c/webmcp-polyfill` when the browser has no `document.modelContext`. **Native browser agents do not see tools that the polyfill registers.** The polyfill is for the devtools panel, tests, and an in-app chat. For a native agent, use a browser from the [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) of the WebMCP draft.
 
 When an agent calls `addTodo`, the page shows a dialog with the tool name, the description, and the input. The action runs after you select "Allow". `listTodos` runs without a dialog, because it is read-only.
 
@@ -170,7 +170,7 @@ A `'use server'` file can export only async functions, so the schemas must live 
 | `fromSafeAction` | a next-safe-action action |
 | none | `(input) => Promise<Result>` |
 
-With these paths the action validates its own input, as it already does for your UI. The `input` schema describes the tool to the agent.
+A listed action validates its own input, as it already does for your UI. The `input` schema describes the tool to the agent.
 
 ## Add the navigation tool
 
@@ -182,7 +182,7 @@ The `navigate` tool lets an agent open a page of the app. By default it lists th
 
 ## Next steps
 
-- [Security model](security-model.md): what actionmcp protects and what stays your responsibility.
+- [Security](security.md): what actionmcp protects and what stays your responsibility.
 - [API reference](api-reference.md): every export and option.
 - [FAQ](faq.md).
-- The [examples](../examples): one app per path, and an in-app chat with the AI SDK.
+- The [examples](../examples): one app per way to define tools, and an in-app chat with the AI SDK.

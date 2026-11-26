@@ -2,9 +2,7 @@
 
 This project follows [Semantic Versioning](https://semver.org). While the version is 0.x, a minor release can contain breaking changes.
 
-## Unreleased
-
-The first version, 0.1.0, is implemented and not published to npm.
+## 0.1.0
 
 ### Added
 
@@ -17,5 +15,3 @@ The first version, 0.1.0, is implemented and not published to npm.
 - `withAgentTools()` for `next.config`: code generation during the build and in development, and the registry alias for Turbopack and webpack.
 - The `actionmcp` CLI with `generate`, `inspect`, and `doctor`, and the diagnostic codes `AT001` to `AT205`.
 - `<AgentToolsDevtools />`: a development panel that lists and runs tools.
-- Examples for each path and for an in-app chat with the AI SDK WebMCP transport.
-- A benchmark harness and its demo app in `bench/`.

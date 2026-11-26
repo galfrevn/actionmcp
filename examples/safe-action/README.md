@@ -1,6 +1,6 @@
 # next-safe-action example
 
-A profile page whose `next-safe-action` action becomes a WebMCP tool with `fromSafeAction()` (path B).
+A profile page whose `next-safe-action` action becomes a WebMCP tool with `fromSafeAction()`.
 
 The adapter unwraps the result of the action:
 

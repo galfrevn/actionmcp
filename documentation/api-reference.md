@@ -1,6 +1,6 @@
 # API reference
 
-This page describes the exports of actionmcp v0.1. The API can change in any 0.x release.
+This page describes the exports of actionmcp. The API can change in any 0.x release.
 
 | Entry point | Use it in | Exports |
 |---|---|---|
@@ -204,7 +204,36 @@ npx actionmcp doctor [--json]
 
 Without flags, the CLI uses the options that `next.config` passes to `withAgentTools()`.
 
-`generate` and `doctor` exit with status 1 when they find an error. The diagnostic codes are in the [specification](spec.md#cli).
+`generate` and `doctor` exit with status 1 when they find an error.
+
+## Diagnostics
+
+`generate`, `inspect`, and `doctor` report problems with a code, a file, a line, a column, and a suggested fix. An error stops `next build`.
+
+| Code | Level | Meaning |
+|---|---|---|
+| `AT001` | error | Invalid tool name, or a name that is not a string literal |
+| `AT002` | error | Duplicate or reserved name (`snapshot`, `act`, `query`, `pause_hmr`, `resume_hmr`, `nextjs_inspect`, `nextjs_compile_route`, `navigate`) |
+| `AT003` | error | Empty description |
+| `AT004` | error | `agent()` or `@agent` on a function that is not exported, or in a file without `'use server'` |
+| `AT005` | error | `description` is not a string literal, or the options are not an object literal |
+| `AT006` | error | Unknown `@agent` modifier |
+| `AT007` | error | The registry file is not a `defineAgentTools({ ... })` call with an object literal of `tool(...)` calls |
+| `AT101` | warn | A schema cannot be converted to JSON Schema, so the tool is registered without `inputSchema`. For Standard Schema validators the check runs when the app renders, and the warning is logged in development. |
+| `AT102` | warn | `@agent` function without detectable runtime validation |
+| `AT103` | warn | Consequential tool with `confirm: 'never'` |
+| `AT104` | warn | More than 32 tools |
+| `AT105` | warn | `agent()` or `@agent` handler without a call to a configured auth function |
+| `AT106` | warn | `output` schema with free-form strings and no `untrustedOutput` |
+| `AT107` | warn | Input schema with a personal field (`email`, `phone`, `address`, `birthdate`, `birthday`, `dob`, `ssn`, `passport`) that the handler does not use |
+| `AT108` | warn | Description shorter than 20 characters |
+| `AT201` | error | Next.js is missing or is not 16.x (`doctor`) |
+| `AT202` | error | React is missing or older than 19.2 (`doctor`) |
+| `AT203` | warn | A validator without Standard JSON Schema support is installed (`doctor`) |
+| `AT204` | warn | The origin trial token is not set (`doctor`) |
+| `AT205` | warn | An adapted action is registered without an `input` schema |
+
+`AT102` and `AT105` to `AT107` are heuristics over the source code.
 
 ## Generated files
 

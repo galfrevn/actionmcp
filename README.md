@@ -4,7 +4,13 @@ WebMCP tools from your Server Actions.
 
 actionmcp turns the Server Functions and routes that you opt in, in a Next.js App Router app, into typed [WebMCP](https://webmachinelearning.github.io/webmcp/) tools. Browser agents discover the tools on `document.modelContext` and call them with the user's session, through the same RPC that your UI uses.
 
-> **Status:** v0.1 is implemented and tested in this repository. It is not published to npm yet. WebMCP is a Community Group draft, so expect breaking changes in 0.x releases.
+## Install
+
+```bash
+npm install actionmcp
+```
+
+Until the first npm release, build the package from this repository with `pnpm install && pnpm build`.
 
 ## Usage
 
@@ -58,7 +64,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 The [getting started guide](documentation/getting-started.md) covers each step, the CLI, and the devtools panel.
 
-## What you get
+## Features
 
 - **Three ways to opt in.** `agent()` for new or edited actions, `defineAgentTools()` for existing `useActionState` and next-safe-action actions without changing them, and an experimental `@agent` JSDoc tag.
 - **Schemas from your validator.** The input schema comes from Zod, Valibot, or ArkType through Standard JSON Schema. `agent()` validates with the same schema on the server.
@@ -70,32 +76,12 @@ The [getting started guide](documentation/getting-started.md) covers each step, 
 
 ## Security defaults
 
-The full threat model is in [security.md](documentation/security.md). The short version is in the [security model](documentation/security-model.md).
-
 - Opt-in only. Nothing becomes a tool without `agent()`, `tool()`, or `@agent`.
 - Consequential by default. A tool is consequential unless it is marked `readOnly`.
-- `confirm: 'consequential'` by default. An in-page dialog asks a human before a consequential tool runs.
+- Human confirmation. An in-page dialog asks a person before a consequential tool runs.
 - Native RPC only. Tools execute through the Server Function RPC, with no new endpoints.
 
-Authentication, ownership checks, and rate limiting stay inside your actions. actionmcp does not add them.
-
-## Where WebMCP runs today
-
-Browser support changes often. Check the [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) before you rely on any row. The rows below come from [research.md](documentation/research.md), section 1 and section 2.
-
-**Verified** means the fact was checked against a primary source. **Secondary source** means a third party reported it.
-
-| Consumer | Status | Marker | Source date |
-|---|---|---|---|
-| Chrome | Origin Trial from Chrome 149. Local testing with `chrome://flags/#enable-webmcp-testing`. The trial reportedly ends at Chrome 156. | Verified for the trial. Secondary source for the end version. | 2026-11-26 |
-| Edge | Origin Trial in Edge 150. | Verified | 2026-11-26 |
-| ChatGPT Desktop | "Site tools" in the built-in browser. Discovers tools at the top level and in iframes. | Verified | 2026-11-26 |
-| Brave | Leo AI chat support in Brave 1.102.2, planned for 2027-01-05. | Verified | 2026-11-26 |
-| `@w3c/webmcp-polyfill` v0.2.0 | Adds `document.modelContext` when the browser lacks it. Native browser agents do not see the polyfill's tools. | Verified | 2026-11-26 (release 2026-11-23) |
-
-Firefox and Safari have standards positions only. This is **Verified** as of 2026-11-26 in the same source.
-
-What this repository tests on every commit: Chromium 159 with the polyfill, and Chromium 159 with native WebMCP (`--enable-features=WebMCP`). actionmcp has not been tested in ChatGPT Desktop yet. The [manual checklist](e2e/manual/chatgpt.md) is open.
+Authentication, ownership checks, and rate limiting stay inside your actions. The [security page](documentation/security.md) has the per-tool checklist and the threat model.
 
 ## How it works
 
@@ -104,11 +90,17 @@ What this repository tests on every commit: Chromium 159 with the polyfill, and 
 3. The Client Component registers the tools on `document.modelContext` and unregisters them when its layout unmounts.
 4. When an agent calls a tool, the page asks for confirmation if the tool is consequential, then calls the Server Function reference. Next.js sends the same POST as for a call from your UI and revalidates the page.
 
-The validator, the registry, and the analyzer stay on the server. The client code for registration and confirmation is about 3 KB gzip, measured by [`bundle-size.test.ts`](packages/actionmcp/src/react/bundle-size.test.ts).
+The validator, the registry, and the analyzer stay on the server. The [architecture page](documentation/architecture.md) describes each part.
+
+## Browser support
+
+WebMCP is a Community Group draft, and browser support changes often. The [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) of the draft lists the browsers and agents that implement it.
+
+The `polyfill` option of `<AgentTools />` loads [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill) when the browser has no `document.modelContext`. It serves an in-app chat, the devtools panel, and tests. Native browser agents do not see tools that the polyfill registers.
 
 ## Requirements
 
-- Next.js 16.x with the App Router ([ADR-013](documentation/decisions.md#adr-013-supported-nextjs-versions)). CI builds the fixtures on 16.4.6 and 16.2.12.
+- Next.js 16.x with the App Router.
 - React 19.2 or later.
 - Node.js 22.18 or later.
 - A validator with Standard JSON Schema support: Zod 4.2+, ArkType 2.1.28+, or Valibot 1.2+ with `@valibot/to-json-schema`.
@@ -132,23 +124,11 @@ pnpm --filter example-basic dev
 ## Documentation
 
 - [Getting started](documentation/getting-started.md)
-- [Security model](documentation/security-model.md)
 - [API reference](documentation/api-reference.md)
+- [Security](documentation/security.md)
+- [Architecture](documentation/architecture.md)
+- [Testing](documentation/testing.md)
 - [FAQ](documentation/faq.md)
-
-Design documents:
-
-- [Specification](documentation/spec.md): the problem, non-goals, scope, public API, and CLI.
-- [Architecture](documentation/architecture.md): modules, build flow, and runtime flow.
-- [Security](documentation/security.md): threat model and non-negotiable defaults.
-- [Testing](documentation/testing.md): test levels, fixtures, compatibility matrix, demo, and benchmark method.
-- [Roadmap](documentation/roadmap.md): status, tasks, spike results, and risks.
-- [Decisions](documentation/decisions.md): ADR-001 to ADR-017.
-- [Research](documentation/research.md): WebMCP, browser, framework, and schema facts, each with a date and a marker.
-
-## Benchmark
-
-The [benchmark harness](bench/README.md) compares an agent that clicks through the UI with the same agent that calls the WebMCP tools. No results are published yet: a run needs a model key.
 
 ## Contributing
 

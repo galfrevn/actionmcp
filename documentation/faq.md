@@ -2,11 +2,11 @@
 
 ## Why don't you expose every Server Action?
 
-Because exposure is a security decision, and a default cannot make it for you. A named, described tool that an agent can call with the user's session has more reach than an unlisted endpoint, especially when the agent reads untrusted content. actionmcp exposes a function only when you wrap it in `agent()`, list it with `tool()`, or tag it with `@agent`. There is no flag that exposes everything ([ADR-003](decisions.md#adr-003-strictly-opt-in-exposure)).
+Because exposure is a security decision, and a default cannot make it for you. A named, described tool that an agent can call with the user's session has more reach than an unlisted endpoint, especially when the agent reads untrusted content. actionmcp exposes a function only when you wrap it in `agent()`, list it with `tool()`, or tag it with `@agent`. There is no flag that exposes everything.
 
 ## Does it work in Safari or Firefox?
 
-Not with a native agent. Safari and Firefox have standards positions on WebMCP and no implementation, as of 2026-11-26. The [README](../README.md#where-webmcp-runs-today) lists the browsers and agents that support it.
+Not with a native agent, as long as those browsers do not implement WebMCP. The [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) of the WebMCP draft lists the browsers and agents that support it.
 
 The `polyfill` option adds `document.modelContext` in any browser. That is enough for an in-app chat, the devtools panel, and tests. A native browser agent does not see tools that the polyfill registers.
 
@@ -22,11 +22,11 @@ A result, not an exception:
 { "ok": false, "error": { "code": "invalid_input", "message": "Invalid input.", "issues": [{ "message": "Too small", "path": ["text"] }] } }
 ```
 
-Browsers replace a rejected tool call with a fixed "Tool execution failed." message, so actionmcp returns failures as values ([ADR-015](decisions.md#adr-015-tool-failures-are-results-not-rejections)). The codes that the library uses are `invalid_input`, `unauthorized`, `failed`, `declined`, and `blocked`. A handler can return its own code with `throw new AgentToolError('not_found', 'There is no todo with that id.')`.
+Browsers replace a rejected tool call with a fixed "Tool execution failed." message, so actionmcp returns failures as values. The codes that the library uses are `invalid_input`, `unauthorized`, `failed`, `declined`, and `blocked`. A handler can return its own code with `throw new AgentToolError('not_found', 'There is no todo with that id.')`.
 
 ## Why does a dialog appear before a tool runs?
 
-A tool that is not read-only is consequential by default, and the page asks a human before it runs. Some agents also ask, so a user can see two confirmations. No agent guarantees its own confirmation today, which is why the page asks ([ADR-012](decisions.md#adr-012-confirmation-for-consequential-tools-by-default)).
+A tool that is not read-only is consequential by default, and the page asks a human before it runs. Some agents also ask, so a user can see two confirmations. No agent guarantees its own confirmation today, which is why the page asks.
 
 To skip the dialog for one tool, set `readOnly: true` if the tool only reads, or `confirm: 'never'` if you accept the risk. `doctor` reports `AT103` for the second case.
 
@@ -67,7 +67,7 @@ If a schema validates but cannot produce JSON Schema, the tool is registered wit
 
 ## Why must my schema live outside the `'use server'` file?
 
-Only for path B. A `'use server'` file can export only async functions, so `agent-tools.ts` cannot import a schema from it. Move the schema to a regular module and import it from both places. With `agent()` the schema stays next to the action.
+Only when you list existing actions in `agent-tools.ts`. A `'use server'` file can export only async functions, so `agent-tools.ts` cannot import a schema from it. Move the schema to a regular module and import it from both places. With `agent()` the schema stays next to the action.
 
 ## My action calls `redirect()`. What does the agent get?
 
@@ -75,7 +75,7 @@ Only for path B. A `'use server'` file can export only async functions, so `agen
 
 ## Do tools run in parallel?
 
-No. Next.js dispatches Server Actions one at a time per client, so a tool call queues behind other actions, including the ones your UI starts. An action in flight cannot be cancelled. Planned for phase 2: read-only tools through GET route handlers.
+No. Next.js dispatches Server Actions one at a time per client, so a tool call queues behind other actions, including the ones your UI starts. An action in flight cannot be cancelled.
 
 ## How do I avoid name clashes with other tools on the page?
 
@@ -100,8 +100,8 @@ export function Tools() {
 
 ## Is the API stable?
 
-No. WebMCP is a Community Group draft that changes often, and actionmcp is at 0.x. Expect breaking changes in minor versions until 1.0.
+No. WebMCP is a Community Group draft that changes often, and actionmcp is at 0.x. A minor version can contain breaking changes until 1.0.
 
 ## Does it work with the Pages Router, or with Next.js 15?
 
-No. v0.1 supports the App Router on Next.js 16.x ([ADR-013](decisions.md#adr-013-supported-nextjs-versions)).
+No. actionmcp supports the App Router on Next.js 16.x.

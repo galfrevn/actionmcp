@@ -1,6 +1,6 @@
 # Basic example
 
-A todo app that exposes four Server Functions as WebMCP tools with `agent()` (path A).
+A todo app that exposes four Server Functions as WebMCP tools with `agent()`.
 
 | Tool | Annotations | Confirmation |
 |---|---|---|
@@ -25,7 +25,7 @@ Open http://localhost:3000 and select "Sign in as demo". The tools return an `un
 - Run `pnpm --filter example-basic inspect` to print the tools that the build registers.
 - Run `pnpm --filter example-basic doctor` to check the project.
 
-`<AgentTools polyfill />` loads `@w3c/webmcp-polyfill` when the browser has no native WebMCP. Native browser agents do not see tools that the polyfill registers. To test with a native agent, use a browser from the "Where WebMCP runs today" table in the [README](../../README.md).
+`<AgentTools polyfill />` loads `@w3c/webmcp-polyfill` when the browser has no native WebMCP. Native browser agents do not see tools that the polyfill registers. To test with a native agent, use a browser from the [implementation status page](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) of the WebMCP draft.
 
 ## Files
 

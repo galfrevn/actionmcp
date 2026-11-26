@@ -2,7 +2,7 @@
 
 This harness measures how a browser agent performs on the same Next.js app in two modes: operating the UI through the accessibility tree, and calling the WebMCP tools that actionmcp registers.
 
-**No results are published yet.** The harness and the demo app are in this folder. A run needs a model key, and nobody has run the full benchmark so far. The method is in [testing.md](../documentation/testing.md#benchmark-clicks-vs-webmcp).
+The harness and the demo app are in this folder. A run needs a model key.
 
 ## What it runs
 

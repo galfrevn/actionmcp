@@ -1,6 +1,6 @@
 # FormData example
 
-A team page whose existing `useActionState` actions become WebMCP tools without any change to the actions (path B).
+A team page whose existing `useActionState` actions become WebMCP tools without any change to the actions.
 
 The actions keep their `(previousState, formData)` signature. `agent-tools.ts` lists them with `defineAgentTools()` and `fromFormDataAction()`. The browser builds a `FormData` from the agent's input and calls the same Server Function that the form calls.
 

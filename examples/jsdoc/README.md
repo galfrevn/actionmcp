@@ -1,8 +1,8 @@
 # JSDoc example
 
-Two Server Functions become WebMCP tools with the `@agent` JSDoc tag (path C).
+Two Server Functions become WebMCP tools with the `@agent` JSDoc tag.
 
-Path C is experimental and opt-in. `next.config.ts` enables it with `withAgentTools({ jsdoc: true })`.
+The tag is experimental and opt-in. `next.config.ts` enables it with `withAgentTools({ jsdoc: true })`.
 
 | Tool | Tag | Confirmation |
 |---|---|---|
@@ -11,7 +11,7 @@ Path C is experimental and opt-in. `next.config.ts` enables it with `withAgentTo
 
 During `generate`, actionmcp infers each input schema from the type of the first parameter. Property descriptions come from the JSDoc of each property.
 
-**actionmcp does not validate the input of a path C tool.** Each action in this example parses its input with Zod. If an action does not validate, `actionmcp doctor` reports `AT102`.
+**actionmcp does not validate the input of an `@agent` tool.** Each action in this example parses its input with Zod. If an action does not validate, `actionmcp doctor` reports `AT102`.
 
 ## Run
 
