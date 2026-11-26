@@ -161,7 +161,7 @@ A Client Component that configures the tools registered below it.
 
 ### `<AgentToolsDevtools />`
 
-A floating panel that renders only when `NODE_ENV` is `development`. It shows whether WebMCP is native, from the polyfill, or unavailable, lists every tool on the page, runs a tool with JSON input, and keeps a history of calls to actionmcp tools.
+A floating panel that renders only when `NODE_ENV` is `development`. It shows whether WebMCP is native, from the polyfill, or unavailable. It reports "native" only when `registerTool` and the constructor of `document.modelContext` are browser functions, so a context that a script or an extension builds, even around a bound native function, shows as the polyfill. It lists every tool on the page, runs a tool with JSON input, and keeps a history of calls to actionmcp tools.
 
 ### `ConfirmDialog`
 

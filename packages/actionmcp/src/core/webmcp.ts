@@ -30,7 +30,15 @@ export function getModelContext(): ModelContext | undefined {
 export function getWebMCPStatus(): WebMCPStatus {
   const context = getModelContext()
   if (!context) return 'unavailable'
-  return Function.prototype.toString.call(context.registerTool).includes('[native code]') ? 'native' : 'polyfill'
+  const prototype: unknown = Object.getPrototypeOf(context)
+  const constructor = typeof prototype === 'object' && prototype !== null ? (prototype as { constructor?: unknown }).constructor : undefined
+  return isNativeFunction(context.registerTool) && isNativeFunction(constructor) ? 'native' : 'polyfill'
+}
+
+function isNativeFunction(value: unknown): boolean {
+  return (
+    typeof value === 'function' && !value.name.startsWith('bound ') && Function.prototype.toString.call(value).includes('[native code]')
+  )
 }
 
 export function loadPolyfill(): Promise<ModelContext | undefined> {
